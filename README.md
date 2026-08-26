@@ -97,11 +97,12 @@ Admin → **Ads / Monetag**
 
 এটা **Vite React সাইট + `/api` Worker** — Hono Node server নয়। Root এ `wrangler.jsonc` আছে।
 
-1. GitHub repo `devabhai-1/feedboss` Cloudflare Workers/Pages এ কানেক্ট করুন।
+1. GitHub repo `devabhai-1/feedboss` Cloudflare Workers এ কানেক্ট করুন।
 2. Worker name: `feedboss1`
-3. Build command: `npm run build`
-4. Root directory: `/` (repo root)
-5. Build environment variables (Vite):
+3. **Build command:** `npm run build`
+4. **Deploy command:** `npm run build && npx wrangler deploy`
+5. Root directory: `/` (repo root)
+6. Build environment variables (Vite):
 
 ```
 VITE_FIREBASE_API_KEY
