@@ -20,7 +20,7 @@ export function AdminVideos() {
   }, [videos, q, status])
 
   const remove = async (id: string) => {
-    if (!confirm('ভিডিও ডিলিট করবেন?')) return
+    if (!confirm('Delete this video?')) return
     setBusy(id)
     await db.deleteVideo(id)
     await refresh()
@@ -31,15 +31,15 @@ export function AdminVideos() {
     <div>
       <Seo title="Videos | Admin" />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">ভিডিও</h1>
+        <h1 className="text-2xl font-bold">Videos</h1>
         <Link to="/admin/videos/new" className="btn btn-primary">
-          নতুন আপলোড
+          New upload
         </Link>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <input className="input max-w-sm" value={q} onChange={(e) => setQ(e.target.value)} placeholder="সার্চ..." />
+        <input className="input max-w-sm" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search..." />
         <select className="input max-w-[160px]" value={status} onChange={(e) => setStatus(e.target.value as VideoStatus | 'all')}>
-          <option value="all">সব স্ট্যাটাস</option>
+          <option value="all">All status</option>
           <option value="published">published</option>
           <option value="draft">draft</option>
           <option value="hidden">hidden</option>
@@ -66,10 +66,10 @@ export function AdminVideos() {
                     <img src={v.thumbnailUrl} alt="" className="h-12 w-20 rounded object-cover" />
                   </td>
                   <td className="p-3">
-                    <div className="font-semibold">{v.titleBn}</div>
-                    <div className="text-xs text-muted">{v.titleEn}</div>
+                    <div className="font-semibold">{v.titleEn || v.titleBn}</div>
+                    <div className="text-xs text-muted">{v.titleBn}</div>
                   </td>
-                  <td className="p-3">{cat?.nameBn}</td>
+                  <td className="p-3">{cat?.nameEn || cat?.nameBn}</td>
                   <td className="p-3">{v.status}</td>
                   <td className="p-3">{v.views}</td>
                   <td className="p-3">

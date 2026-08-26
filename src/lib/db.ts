@@ -9,7 +9,7 @@ import {
   increment,
 } from 'firebase/firestore'
 import { firebaseEnabled, firestore } from './firebase'
-import { defaultAds, defaultCategories, defaultPerformers, defaultSettings, defaultTags, defaultVideos } from './seed'
+import { defaultAds, defaultCategories, defaultPerformers, defaultSettings, defaultTags, defaultVideos, applyLegalCopy } from './seed'
 import type { Ad, Category, Performer, SiteSettings, Tag, Video } from '../types'
 
 const KEYS = {
@@ -241,10 +241,10 @@ export const db = {
     if (firebaseEnabled && firestore) {
       const snap = await getDoc(doc(firestore, 'settings', 'site'))
       const data = snap.exists() ? (snap.data() as SiteSettings) : defaultSettings
-      return { ...defaultSettings, ...data, uploadSecret: '' }
+      return applyLegalCopy({ ...defaultSettings, ...data, uploadSecret: '' })
     }
     ensureLocalSeed()
-    return { ...defaultSettings, ...readLs<SiteSettings>(KEYS.settings, defaultSettings) }
+    return applyLegalCopy({ ...defaultSettings, ...readLs<SiteSettings>(KEYS.settings, defaultSettings) })
   },
 
   async getPrivateSettings(): Promise<{ uploadSecret: string }> {

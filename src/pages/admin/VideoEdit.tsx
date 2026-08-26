@@ -68,7 +68,7 @@ export function VideoEdit() {
     )
   }, [form, videos])
 
-  if (!form) return <p className="text-muted">ভিডিও পাওয়া যায়নি।</p>
+  if (!form) return <p className="text-muted">Video not found.</p>
 
   const set = <K extends keyof Video>(key: K, value: Video[K]) => setForm({ ...form, [key]: value })
 
@@ -93,7 +93,7 @@ export function VideoEdit() {
         }
       }
     } catch (err) {
-      setMsg(err instanceof Error ? err.message : 'ভিডিও পড়া যায়নি')
+      setMsg(err instanceof Error ? err.message : 'Could not read video')
     }
   }
 
@@ -109,7 +109,7 @@ export function VideoEdit() {
   const onSave = async (e: FormEvent) => {
     e.preventDefault()
     if (!form.titleBn && !form.titleEn) {
-      setMsg('বাংলা বা ইংরেজি টাইটেল দিন')
+      setMsg('Add a Bangla or English title')
       return
     }
     setBusy(true)
@@ -150,12 +150,12 @@ export function VideoEdit() {
         updatedAt: Date.now(),
         createdAt: isNew ? Date.now() : form.createdAt,
       }
-      if (!payload.videoUrl) throw new Error('ভিডিও URL বা ফাইল লাগবে')
+      if (!payload.videoUrl) throw new Error('A video URL or file is required')
       await db.saveVideo(payload)
       await refresh()
       navigate('/admin/videos')
     } catch (err) {
-      setMsg(err instanceof Error ? err.message : 'সেভ ব্যর্থ')
+      setMsg(err instanceof Error ? err.message : 'Save failed')
     } finally {
       setBusy(false)
     }
@@ -165,16 +165,16 @@ export function VideoEdit() {
     <form onSubmit={(e) => void onSave(e)} className="max-w-5xl">
       <Seo title={isNew ? 'New video' : 'Edit video'} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">{isNew ? 'নতুন ভিডিও' : 'ভিডিও এডিট'}</h1>
+        <h1 className="text-2xl font-bold">{isNew ? 'New video' : 'Edit video'}</h1>
         <button className="btn btn-primary" disabled={busy} type="submit">
-          {busy ? `সেভ হচ্ছে ${progress || ''}${progress ? '%' : ''}` : 'সেভ করুন'}
+          {busy ? `Saving ${progress || ''}${progress ? '%' : ''}` : 'Save'}
         </button>
       </div>
       {msg && <p className="mt-3 text-sm text-accent">{msg}</p>}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div className="space-y-3">
-          <label className="text-sm">ভিডিও ফাইল (Cloudflare R2)</label>
+          <label className="text-sm">Video file (Cloudflare R2)</label>
           <input
             className="input"
             type="file"
@@ -184,15 +184,15 @@ export function VideoEdit() {
               if (f) void onPickVideo(f)
             }}
           />
-          <label className="text-sm">অথবা ভিডিও URL</label>
+          <label className="text-sm">Or video URL</label>
           <input className="input" value={form.videoUrl} onChange={(e) => set('videoUrl', e.target.value)} placeholder="https://cdn.../video.mp4" />
           <video ref={previewRef} className="mt-2 aspect-video w-full rounded-xl bg-black" controls src={previewSrc || form.videoUrl} />
           <div className="flex gap-2">
             <button className="btn btn-ghost" type="button" onClick={() => void grabThumb()}>
-              ভিডিও থেকে থাম্বনেইল নিন
+              Capture thumbnail from video
             </button>
           </div>
-          <label className="text-sm">থাম্বনেইল ফাইল</label>
+          <label className="text-sm">Thumbnail file</label>
           <input
             className="input"
             type="file"
@@ -204,31 +204,31 @@ export function VideoEdit() {
               set('thumbnailUrl', URL.createObjectURL(f))
             }}
           />
-          <label className="text-sm">অথবা থাম্বনেইল URL</label>
+          <label className="text-sm">Or thumbnail URL</label>
           <input className="input" value={form.thumbnailUrl.startsWith('blob:') ? '' : form.thumbnailUrl} onChange={(e) => set('thumbnailUrl', e.target.value)} />
           {form.thumbnailUrl && <img src={form.thumbnailUrl} alt="" className="h-36 w-64 rounded-lg object-cover" />}
         </div>
 
         <div className="space-y-3">
-          <label className="text-sm">টাইটেল (বাংলা)</label>
+          <label className="text-sm">Title (Bangla, public site)</label>
           <input className="input" value={form.titleBn} onChange={(e) => set('titleBn', e.target.value)} />
           <label className="text-sm">Title (English)</label>
           <input className="input" value={form.titleEn} onChange={(e) => set('titleEn', e.target.value)} />
           <label className="text-sm">Slug</label>
           <input className="input" value={form.slug} onChange={(e) => set('slug', e.target.value)} placeholder={slugPreview} />
-          <label className="text-sm">ক্যাপশন (বাংলা)</label>
+          <label className="text-sm">Caption (Bangla, public site)</label>
           <textarea className="input min-h-24" value={form.captionBn} onChange={(e) => set('captionBn', e.target.value)} />
           <label className="text-sm">Caption (English)</label>
           <textarea className="input min-h-24" value={form.captionEn} onChange={(e) => set('captionEn', e.target.value)} />
-          <label className="text-sm">ক্যাটাগরি</label>
+          <label className="text-sm">Category</label>
           <select className="input" value={form.categoryId} onChange={(e) => set('categoryId', e.target.value)}>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.nameBn} / {c.nameEn}
+                {c.nameEn} / {c.nameBn}
               </option>
             ))}
           </select>
-          <label className="text-sm">ট্যাগ</label>
+          <label className="text-sm">Tags</label>
           <div className="flex flex-wrap gap-2">
             {tags.map((t) => {
               const on = form.tagIds.includes(t.id)
@@ -239,12 +239,12 @@ export function VideoEdit() {
                   className={`rounded-full border px-3 py-1 text-sm ${on ? 'border-accent bg-accent/20' : 'border-line'}`}
                   onClick={() => set('tagIds', on ? form.tagIds.filter((x) => x !== t.id) : [...form.tagIds, t.id])}
                 >
-                  {t.nameBn}
+                  {t.nameEn || t.nameBn}
                 </button>
               )
             })}
           </div>
-          <label className="text-sm">মডেল</label>
+          <label className="text-sm">Models</label>
           <div className="flex flex-wrap gap-2">
             {performers.map((m) => {
               const on = form.modelIds.includes(m.id)
@@ -262,7 +262,7 @@ export function VideoEdit() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm">স্ট্যাটাস</label>
+              <label className="text-sm">Status</label>
               <select className="input mt-1" value={form.status} onChange={(e) => set('status', e.target.value as VideoStatus)}>
                 <option value="published">published</option>
                 <option value="draft">draft</option>

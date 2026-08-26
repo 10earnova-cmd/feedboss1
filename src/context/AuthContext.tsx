@@ -81,28 +81,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser({ uid: 'demo', email: DEMO_EMAIL })
         return
       }
-      throw new Error('ডেমো লগইন:  admin@deshix.com  /  admin123')
+      throw new Error('Demo login:  admin@deshix.com  /  admin123')
     }
     const cred = await signInWithEmailAndPassword(auth, email, password)
     await ensureAdminDoc(cred.user)
     const allowed = await isAdminUser(cred.user)
     if (!allowed) {
       await signOut(auth)
-      throw new Error('এই ইমেইল অ্যাডমিন নয়। Firestore admins কালেকশনে UID যোগ করুন অথবা VITE_ADMIN_EMAIL মিলিয়ে নিন।')
+      throw new Error('This email is not an admin. Add the UID in Firestore admins, or set VITE_ADMIN_EMAIL.')
     }
     setUser({ uid: cred.user.uid, email: cred.user.email || '' })
   }
 
   const register = async (email: string, password: string) => {
     if (!firebaseEnabled || !auth) {
-      throw new Error('Firebase চালু করলেই নতুন অ্যাডমিন তৈরি হবে।')
+      throw new Error('Connect Firebase to create a new admin.')
     }
     const cred = await createUserWithEmailAndPassword(auth, email, password)
     await ensureAdminDoc(cred.user)
     const allowed = await isAdminUser(cred.user)
     if (!allowed) {
       await signOut(auth)
-      throw new Error('রেজিস্টার হয়েছে কিন্তু অ্যাডমিন নয়। VITE_ADMIN_EMAIL এই ইমেইল দিন।')
+      throw new Error('Account created but this email is not an admin. Set VITE_ADMIN_EMAIL to this email.')
     }
     setUser({ uid: cred.user.uid, email: cred.user.email || '' })
   }

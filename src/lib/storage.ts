@@ -30,7 +30,7 @@ export async function uploadMedia(opts: {
   const token = auth?.currentUser ? await auth.currentUser.getIdToken() : opts.uploadSecret
   const bearer = token || opts.uploadSecret
   if (!bearer) {
-    throw new Error('Upload secret বা Firebase login লাগবে।')
+    throw new Error('Upload secret or Firebase login is required.')
   }
 
   const keyHint = `${opts.folder}/${crypto.randomUUID()}.${extOf(opts.file)}`
@@ -53,7 +53,7 @@ export async function uploadMedia(opts: {
       }
       reject(new Error(body?.error || `Upload failed (${xhr.status})`))
     }
-    xhr.onerror = () => reject(new Error('Network error — worker URL / CORS চেক করুন'))
+    xhr.onerror = () => reject(new Error('Network error — check worker URL / CORS'))
     const form = new FormData()
     form.append('file', opts.file)
     form.append('folder', opts.folder)
@@ -93,6 +93,6 @@ export function readVideoMeta(file: File): Promise<{ duration: number; objectUrl
     video.onloadedmetadata = () => {
       resolve({ duration: Math.round(video.duration || 0), objectUrl: url })
     }
-    video.onerror = () => reject(new Error('ভিডিও মেটাডেটা পড়া যায়নি'))
+    video.onerror = () => reject(new Error('Could not read video metadata'))
   })
 }

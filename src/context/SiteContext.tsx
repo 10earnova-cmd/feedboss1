@@ -66,12 +66,12 @@ export function SiteProvider({ children }: { children: ReactNode }) {
       <div className="grid min-h-svh place-items-center bg-ink px-4 text-white">
         {error ? (
           <div className="card max-w-lg p-6">
-            <h1 className="text-xl font-bold">Firebase কানেক্ট হয়নি</h1>
+            <h1 className="text-xl font-bold">Firebase is not connected</h1>
             <p className="mt-2 text-sm text-muted">{error}</p>
             <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-muted">
-              <li>Firebase Console → Firestore Database তৈরি করুন (start in test/production mode)</li>
-              <li>Authentication → Email/Password চালু করুন</li>
-              <li>Firestore Rules এ প্রজেক্টের firestore.rules পেস্ট করে Publish করুন</li>
+              <li>Firebase Console → create a Firestore Database</li>
+              <li>Authentication → enable Email/Password</li>
+              <li>Firestore Rules → paste this project&apos;s firestore.rules and Publish</li>
             </ol>
           </div>
         ) : (

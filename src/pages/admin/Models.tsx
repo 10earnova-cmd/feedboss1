@@ -39,11 +39,11 @@ export function AdminModels() {
   return (
     <div>
       <Seo title="Models | Admin" />
-      <h1 className="text-2xl font-bold">মডেল</h1>
+      <h1 className="text-2xl font-bold">Models</h1>
       <div className="mt-4 flex gap-2">
-        <input className="input max-w-xs" placeholder="নাম" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="input max-w-xs" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
         <button className="btn btn-primary" type="button" onClick={() => void add()}>
-          যোগ
+          Add
         </button>
       </div>
       <div className="mt-6 space-y-3">
@@ -63,14 +63,14 @@ export function AdminModels() {
             </div>
             <div className="grid gap-2">
               <input className="input" value={m.name} onChange={(e) => void save({ ...m, name: e.target.value })} />
-              <textarea className="input" placeholder="বায়ো বাংলা" value={m.bioBn} onChange={(e) => void save({ ...m, bioBn: e.target.value })} />
+              <textarea className="input" placeholder="Bio (Bangla, public site)" value={m.bioBn} onChange={(e) => void save({ ...m, bioBn: e.target.value })} />
               <textarea className="input" placeholder="Bio English" value={m.bioEn} onChange={(e) => void save({ ...m, bioEn: e.target.value })} />
             </div>
             <button
               className="btn btn-danger h-fit"
               type="button"
               onClick={() => {
-                if (confirm('ডিলিট?')) void db.deletePerformer(m.id).then(() => refresh())
+                if (confirm('Delete?')) void db.deletePerformer(m.id).then(() => refresh())
               }}
             >
               Delete

@@ -8,10 +8,10 @@ export function AdminDashboard() {
   const { videos, published, categories } = useSite()
   const views = videos.reduce((s, v) => s + v.views, 0)
   const stats = [
-    { label: 'মোট ভিডিও', value: videos.length, icon: Film },
-    { label: 'পাবলিশড', value: published.length, icon: Clapperboard },
-    { label: 'মোট ভিউ', value: formatViews(views, 'en'), icon: Eye },
-    { label: 'ক্যাটাগরি', value: categories.length, icon: Upload },
+    { label: 'Total videos', value: videos.length, icon: Film },
+    { label: 'Published', value: published.length, icon: Clapperboard },
+    { label: 'Total views', value: formatViews(views, 'en'), icon: Eye },
+    { label: 'Categories', value: categories.length, icon: Upload },
   ]
 
   return (
@@ -20,7 +20,7 @@ export function AdminDashboard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <Link to="/admin/videos/new" className="btn btn-primary">
-          নতুন ভিডিও আপলোড
+          New video
         </Link>
       </div>
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -32,7 +32,7 @@ export function AdminDashboard() {
           </div>
         ))}
       </div>
-      <h2 className="mt-10 mb-3 font-bold">সাম্প্রতিক ভিডিও</h2>
+      <h2 className="mt-10 mb-3 font-bold">Recent videos</h2>
       <div className="overflow-x-auto card">
         <table className="w-full text-left text-sm">
           <thead className="text-muted">

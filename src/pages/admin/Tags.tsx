@@ -25,23 +25,23 @@ export function AdminTags() {
   return (
     <div>
       <Seo title="Tags | Admin" />
-      <h1 className="text-2xl font-bold">ট্যাগ</h1>
+      <h1 className="text-2xl font-bold">Tags</h1>
       <div className="mt-4 flex flex-wrap gap-2">
-        <input className="input max-w-xs" placeholder="বাংলা" value={nameBn} onChange={(e) => setNameBn(e.target.value)} />
+        <input className="input max-w-xs" placeholder="Bangla (public)" value={nameBn} onChange={(e) => setNameBn(e.target.value)} />
         <input className="input max-w-xs" placeholder="English" value={nameEn} onChange={(e) => setNameEn(e.target.value)} />
         <button className="btn btn-primary" type="button" onClick={() => void add()}>
-          যোগ
+          Add
         </button>
       </div>
       <div className="mt-6 flex flex-wrap gap-2">
         {tags.map((t) => (
           <div key={t.id} className="flex items-center gap-2 rounded-full border border-line px-3 py-1">
-            <span>#{t.nameBn}</span>
+            <span>#{t.nameEn || t.nameBn}</span>
             <button
               className="text-accent"
               type="button"
               onClick={() => {
-                if (confirm('ডিলিট?')) void db.deleteTag(t.id).then(() => refresh())
+                if (confirm('Delete?')) void db.deleteTag(t.id).then(() => refresh())
               }}
             >
               ×

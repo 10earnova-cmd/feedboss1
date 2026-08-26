@@ -37,8 +37,8 @@ export function AdminLogin() {
         </h1>
         <p className="mt-1 text-sm text-muted">
           {firebaseEnabled
-            ? 'Firebase Auth চালু। Console এ Email/Password enable করুন, তারপর এখানে অ্যাডমিন অ্যাকাউন্ট বানান।'
-            : 'ডেমো মোড — Firebase এখনো কানেক্ট নয়।'}
+            ? 'Firebase Auth is on. Enable Email/Password in the console, then create an admin account here.'
+            : 'Demo mode — Firebase is not connected yet.'}
         </p>
         {!firebaseEnabled && (
           <p className="mt-3 rounded-lg bg-raised px-3 py-2 text-xs text-gold">
@@ -55,11 +55,11 @@ export function AdminLogin() {
         </button>
         {firebaseEnabled && (
           <button className="btn btn-ghost mt-2 w-full" type="button" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
-            {mode === 'login' ? 'নতুন অ্যাডমিন রেজিস্টার' : 'আগে থেকে অ্যাকাউন্ট আছে'}
+            {mode === 'login' ? 'Register a new admin' : 'Already have an account'}
           </button>
         )}
         <Link to="/" className="mt-4 block text-center text-sm text-muted">
-          ← সাইটে ফিরে যান
+          ← Back to site
         </Link>
       </form>
     </div>

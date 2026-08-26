@@ -48,13 +48,13 @@ export function AdminCategories() {
   return (
     <div>
       <Seo title="Categories | Admin" />
-      <h1 className="text-2xl font-bold">ক্যাটাগরি</h1>
+      <h1 className="text-2xl font-bold">Categories</h1>
       {msg && <p className="mt-2 text-sm text-accent">{msg}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
-        <input className="input max-w-xs" placeholder="বাংলা নাম" value={nameBn} onChange={(e) => setNameBn(e.target.value)} />
+        <input className="input max-w-xs" placeholder="Bangla name (public)" value={nameBn} onChange={(e) => setNameBn(e.target.value)} />
         <input className="input max-w-xs" placeholder="English name" value={nameEn} onChange={(e) => setNameEn(e.target.value)} />
         <button className="btn btn-primary" type="button" onClick={() => void add()}>
-          যোগ করুন
+          Add
         </button>
       </div>
       <div className="mt-6 space-y-3">
@@ -81,7 +81,7 @@ export function AdminCategories() {
               className="btn btn-danger h-fit"
               type="button"
               onClick={() => {
-                if (confirm('ডিলিট?')) void db.deleteCategory(c.id).then(() => refresh())
+                if (confirm('Delete?')) void db.deleteCategory(c.id).then(() => refresh())
               }}
             >
               Delete

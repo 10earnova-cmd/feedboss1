@@ -4,15 +4,15 @@ import { db, newId } from '../../lib/db'
 import type { Ad, AdSlot, AdType } from '../../types'
 
 const SLOTS: { id: AdSlot; label: string; hint: string }[] = [
-  { id: 'popunder', label: 'Popunder / Script', hint: 'Monetag popunder বা social bar JS পুরো পেস্ট করুন' },
-  { id: 'header', label: 'Header banner', hint: 'সাইটের উপরে HTML/banner' },
-  { id: 'below_player', label: 'প্লেয়ারের নিচে', hint: 'Watch পেজে প্লেয়ারের নিচে' },
-  { id: 'sidebar', label: 'সাইডবার', hint: 'Watch পেজ ডান পাশে' },
-  { id: 'in_grid', label: 'ভিডিও গ্রিড মাঝে', hint: 'প্রতি ৮টা কার্ডে একবার' },
-  { id: 'footer', label: 'ফুটার', hint: 'সাইটের নিচে' },
-  { id: 'mobile_sticky', label: 'মোবাইল স্টিকি বার', hint: 'মোবাইলে নিচে ফিক্সড — direct link ভালো' },
-  { id: 'watch_cta', label: 'Watch CTA (Direct link)', hint: 'Monetag direct URL — ফুল ভিডিও বাটন' },
-  { id: 'download_cta', label: 'Download CTA (Direct link)', hint: 'Monetag direct URL — ডাউনলোড বাটন' },
+  { id: 'popunder', label: 'Popunder / Script', hint: 'Paste the full Monetag popunder or social bar script' },
+  { id: 'header', label: 'Header banner', hint: 'HTML/banner at the top of the site' },
+  { id: 'below_player', label: 'Below player', hint: 'Under the player on the watch page' },
+  { id: 'sidebar', label: 'Sidebar', hint: 'Right side of the watch page' },
+  { id: 'in_grid', label: 'In video grid', hint: 'Once every 8 cards' },
+  { id: 'footer', label: 'Footer', hint: 'Bottom of the site' },
+  { id: 'mobile_sticky', label: 'Mobile sticky bar', hint: 'Fixed bar on mobile — direct link works well' },
+  { id: 'watch_cta', label: 'Watch CTA (Direct link)', hint: 'Monetag direct URL — full video button' },
+  { id: 'download_cta', label: 'Download CTA (Direct link)', hint: 'Monetag direct URL — download button' },
 ]
 
 export function AdminAds() {
@@ -44,9 +44,9 @@ export function AdminAds() {
   return (
     <div>
       <Seo title="Monetag Ads | Admin" />
-      <h1 className="text-2xl font-bold">Monetag অ্যাডস</h1>
+      <h1 className="text-2xl font-bold">Monetag ads</h1>
       <p className="mt-2 max-w-3xl text-sm text-muted">
-        Monetag ড্যাশবোর্ড থেকে Direct Link (otieu.com/4/ZONE) বা Script নিয়ে এখানে পেস্ট করুন। Direct link বাটন ইউজার সাইটে ফুল HD / ডাউনলোড হিসেবে দেখাবে।
+        Paste a Monetag Direct Link (otieu.com/4/ZONE) or script. Direct-link buttons show on the public site as Full HD / Download.
       </p>
       <div className="mt-6 space-y-4">
         {SLOTS.map((s) => {
@@ -61,12 +61,12 @@ export function AdminAds() {
                 </div>
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={Boolean(ad?.enabled)} onChange={(e) => void upsert(s.id, { enabled: e.target.checked, type })} />
-                  চালু
+                  Enabled
                 </label>
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <div>
-                  <label className="text-xs text-muted">টাইপ</label>
+                  <label className="text-xs text-muted">Type</label>
                   <select className="input mt-1" value={type} onChange={(e) => void upsert(s.id, { type: e.target.value as AdType })}>
                     <option value="direct_link">Direct link (Monetag)</option>
                     <option value="html">HTML / banner</option>
@@ -84,7 +84,7 @@ export function AdminAds() {
                 </div>
                 <input
                   className="input"
-                  placeholder="বাটন লেবেল বাংলা"
+                  placeholder="Button label (Bangla, public site)"
                   value={ad?.labelBn || ''}
                   onChange={(e) => void upsert(s.id, { labelBn: e.target.value, type })}
                 />

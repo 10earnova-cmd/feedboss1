@@ -27,26 +27,76 @@ export const defaultSettings: SiteSettings = {
     'This website contains adult sexual content. You must be 18 years or older to enter. By entering you confirm you are an adult and that viewing this material is legal in your location.',
   ageGateBn:
     'এই ওয়েবসাইটে প্রাপ্তবয়স্ক যৌন কনটেন্ট আছে। প্রবেশ করতে আপনার বয়স ১৮ বছর বা তার বেশি হতে হবে। প্রবেশ করে আপনি নিশ্চিত করছেন যে আপনি প্রাপ্তবয়স্ক এবং আপনার এলাকায় এই কনটেন্ট দেখা বৈধ।',
-  termsEn:
-    'DeshiX is an adult entertainment platform. All persons appearing are 18+. You may not upload illegal content, CSAM, non-consensual material, or copyrighted files you do not own. We may remove any video at any time.',
-  termsBn:
-    'DeshiX একটি অ্যাডাল্ট এন্টারটেইনমেন্ট প্ল্যাটফর্ম। সকল ব্যক্তি ১৮+। অবৈধ কনটেন্ট, নাবালক সংক্রান্ত কিছু, অসম্মতিমূলক ভিডিও বা কপিরাইট লঙ্ঘন আপলোড করা যাবে না। যেকোনো ভিডিও আমরা মুছে দিতে পারি।',
-  privacyEn:
-    'We store basic analytics (views) and account data for admins. Ads (Monetag) may set cookies. Do not share passwords. Contact us to request data deletion.',
-  privacyBn:
-    'আমরা ভিউ কাউন্ট ও অ্যাডমিন অ্যাকাউন্ট ডেটা রাখি। বিজ্ঞাপন (Monetag) কুকি ব্যবহার করতে পারে। পাসওয়ার্ড শেয়ার করবেন না। ডেটা মুছতে আমাদের সাথে যোগাযোগ করুন।',
-  dmcaEn:
-    'If you believe your copyright is infringed, email the admin with the video URL, your contact, and proof of ownership. We will review and remove valid claims.',
-  dmcaBn:
-    'কপিরাইট লঙ্ঘন মনে হলে ভিডিওর লিংক, আপনার যোগাযোগ ও মালিকানার প্রমাণসহ অ্যাডমিনকে ইমেইল করুন। বৈধ দাবি রিভিউ করে ভিডিও সরানো হবে।',
-  statement2257En:
-    '18 U.S.C. 2257 record-keeping: All models appearing on this site were 18 years of age or older at the time of depiction. Custodian of records: Site Administrator, contact email in settings.',
-  statement2257Bn:
-    '১৮ U.S.C. ২২৫৭: এই সাইটের সকল মডেলের চিত্রায়ণের সময় বয়স ১৮ বা তার বেশি ছিল। রেকর্ড কিপার: সাইট অ্যাডমিন, সেটিংসের ইমেইল ব্যবহার করুন।',
-  aboutEn:
-    'DeshiX is a Bangladeshi adult video tube. Watch deshi, bangla and homemade clips. Content is managed from the /admin panel.',
-  aboutBn:
-    'DeshiX বাংলাদেশি অ্যাডাল্ট ভিডিও টিউব। দেশী, বাংলা ও হোমমেড ক্লিপ দেখুন। সব কনটেন্ট /admin প্যানেল থেকে ম্যানেজ হয়।',
+  termsEn: `TERMS OF SERVICE
+
+This website is operated from the United States. It is a US-based service.
+
+This site does not create, produce, leak, or originally distribute viral videos. We do not debut, premiere, or first-publish leaked or exclusive clips. We only host and republish open-source / publicly available videos that already exist on the internet.
+
+We are not a leak network. We do not claim ownership of third-party public content. Videos on this site are copies or mirrors of material that was already publicly available online.
+
+All persons depicted must have been 18 years of age or older at the time of depiction. Illegal content, child sexual abuse material, and non-consensual material are strictly forbidden.
+
+We may remove any video at any time. If you believe content should not appear here, contact the site administrator.`,
+  termsBn: `সেবার শর্তাবলী
+
+এই ওয়েবসাইট যুক্তরাষ্ট্র থেকে পরিচালিত হয়। এটি একটি US-based সাইট।
+
+এই সাইট কোনো ভাইরাল ভিডিও তৈরি, প্রোডিউস, লিক বা অরিজিনালি ডিস্ট্রিবিউট করে না। আমরা কোনো এক্সক্লুসিভ বা লিকেড ক্লিপ প্রথমবার প্রকাশ করি না। আমরা শুধু সেই ওপেন-সোর্স / পাবলিক ভিডিও হোস্ট করি যা আগে থেকেই ইন্টারনেটে মজুদ আছে।
+
+এটি লিক নেটওয়ার্ক নয়। থার্ড-পার্টি পাবলিক কনটেন্টের মালিকানা আমরা দাবি করি না।
+
+চিত্রায়ণের সময় সকল ব্যক্তির বয়স ১৮ বা তার বেশি হতে হবে। অবৈধ কনটেন্ট নিষিদ্ধ। যেকোনো ভিডিও আমরা মুছে দিতে পারি।`,
+  privacyEn: `PRIVACY POLICY
+
+This is a US-based website. We store limited technical data such as video view counts and administrator account details needed to operate the service.
+
+We do not sell your personal information. Third-party advertising partners (including Monetag) may set cookies or similar technologies.
+
+Do not share admin passwords. To request deletion of account data, contact the email listed in site settings.
+
+Content on this site is limited to open-source videos already published on the internet. We do not collect or distribute original viral leaks.`,
+  privacyBn: `প্রাইভেসি পলিসি
+
+এটি একটি US-based ওয়েবসাইট। আমরা সীমিত টেকনিক্যাল ডেটা রাখি, যেমন ভিডিও ভিউ কাউন্ট ও অ্যাডমিন অ্যাকাউন্ট তথ্য।
+
+আমরা আপনার ব্যক্তিগত তথ্য বিক্রি করি না। বিজ্ঞাপন পার্টনার (Monetag সহ) কুকি ব্যবহার করতে পারে।
+
+অ্যাডমিন পাসওয়ার্ড শেয়ার করবেন না। অ্যাকাউন্ট ডেটা মুছতে সাইট সেটিংসের ইমেইলে যোগাযোগ করুন।
+
+এই সাইটের কনটেন্ট শুধু সেই ওপেন-সোর্স ভিডিও, যা আগে থেকেই ইন্টারনেটে প্রকাশিত। আমরা অরিজিনাল ভাইরাল লিক সংগ্রহ বা ডিস্ট্রিবিউট করি না।`,
+  dmcaEn: `DMCA NOTICE
+
+This is a US-based website. We host only open-source / already-public internet videos. We do not originally distribute viral or exclusive leaks.
+
+If you are a copyright owner and believe material on this site infringes your rights, email the administrator with: (1) the video URL, (2) your contact information, and (3) proof of ownership. We will review valid claims and remove infringing files.
+
+Counter-notices may be sent to the same contact.`,
+  dmcaBn: `DMCA নোটিশ
+
+এটি US-based সাইট। আমরা শুধু ওপেন-সোর্স / আগে থেকে পাবলিক ইন্টারনেট ভিডিও হোস্ট করি। ভাইরাল বা এক্সক্লুসিভ লিক অরিজিনালি ডিস্ট্রিবিউট করি না।
+
+কপিরাইট মালিক হলে ভিডিওর URL, যোগাযোগ ও মালিকানার প্রমাণসহ অ্যাডমিনকে ইমেইল করুন। বৈধ দাবি রিভিউ করে ফাইল সরানো হবে।`,
+  statement2257En: `18 U.S.C. 2257 STATEMENT
+
+This website is operated from the United States. All models appearing in content on this site were 18 years of age or older at the time of depiction. This site republishes publicly available / open-source adult videos already on the internet; it does not produce original viral content.
+
+Custodian of records: Site Administrator (contact email in settings).`,
+  statement2257Bn: `১৮ U.S.C. ২২৫৭ বিবৃতি
+
+এই ওয়েবসাইট যুক্তরাষ্ট্র থেকে পরিচালিত। এই সাইটের কনটেন্টে চিত্রায়ণের সময় সকল মডেলের বয়স ১৮ বা তার বেশি ছিল। সাইট শুধু ইন্টারনেটে আগে থেকে থাকা পাবলিক / ওপেন-সোর্স অ্যাডাল্ট ভিডিও পুনঃপ্রকাশ করে; অরিজিনাল ভাইরাল কনটেন্ট প্রোডিউস করে না।
+
+রেকর্ড কিপার: সাইট অ্যাডমিন (সেটিংসের ইমেইল)।`,
+  aboutEn: `This is a US-based adult video website.
+
+We do not distribute original viral videos. We do not debut leaked or exclusive clips. We only publish open-source videos that already exist on the internet.
+
+Content is managed from the /admin panel. 18+ only.`,
+  aboutBn: `এটি একটি US-based অ্যাডাল্ট ভিডিও ওয়েবসাইট।
+
+আমরা অরিজিনাল ভাইরাল ভিডিও ডিস্ট্রিবিউট করি না। লিকেড বা এক্সক্লুসিভ ক্লিপ প্রথমবার প্রকাশ করি না। আমরা শুধু সেই ওপেন-সোর্স ভিডিও দিই যা আগে থেকেই ইন্টারনেটে মজুদ আছে।
+
+কনটেন্ট /admin প্যানেল থেকে ম্যানেজ হয়। শুধুমাত্র ১৮+।`,
   r2PublicBase: import.meta.env.VITE_R2_PUBLIC_BASE || '',
   workerUrl: import.meta.env.VITE_R2_WORKER_URL || '/api',
   uploadSecret: import.meta.env.VITE_R2_UPLOAD_SECRET || '',
@@ -130,4 +180,21 @@ export function defaultAds(): Ad[] {
     { id: 'ad_cta', slot: 'watch_cta', name: 'Watch page CTA (Monetag direct)', type: 'direct_link', scriptCode: '', html: '', url: 'https://otieu.com/4/YOUR_ZONE_ID', labelEn: 'Continue to Full Video', labelBn: 'ফুল ভিডিও চালু করুন', enabled: false },
     { id: 'ad_dl', slot: 'download_cta', name: 'Download button (Monetag direct)', type: 'direct_link', scriptCode: '', html: '', url: 'https://otieu.com/4/YOUR_ZONE_ID', labelEn: 'Download HD', labelBn: 'HD ডাউনলোড', enabled: false },
   ]
+}
+
+export function applyLegalCopy(s: SiteSettings): SiteSettings {
+  if (s.termsEn.includes('US-based') && s.termsEn.includes('open-source')) return s
+  return {
+    ...s,
+    termsEn: defaultSettings.termsEn,
+    termsBn: defaultSettings.termsBn,
+    privacyEn: defaultSettings.privacyEn,
+    privacyBn: defaultSettings.privacyBn,
+    dmcaEn: defaultSettings.dmcaEn,
+    dmcaBn: defaultSettings.dmcaBn,
+    statement2257En: defaultSettings.statement2257En,
+    statement2257Bn: defaultSettings.statement2257Bn,
+    aboutEn: defaultSettings.aboutEn,
+    aboutBn: defaultSettings.aboutBn,
+  }
 }
