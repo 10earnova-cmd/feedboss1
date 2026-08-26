@@ -1,0 +1,14 @@
+name = "deshix-media"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+[vars]
+# PUBLIC_BASE_URL = "https://cdn.yourdomain.com"
+# ALLOWED_ORIGIN = "https://yourdomain.com"
+# FIREBASE_WEB_API_KEY = ""
+# ADMIN_EMAILS = "you@example.com"
+# UPLOAD_SECRET = "change-this-long-random-secret"
+
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "deshix-media"
