@@ -8,6 +8,7 @@
     "dev:api": "node --env-file=.env server/index.mjs",
     "dev:web": "vite",
     "build": "tsc -b && vite build",
+    "deploy": "npm run build && wrangler deploy",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -32,6 +33,7 @@
     "oxlint": "^1.79.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "wrangler": "^4.126.0"
   }
 }

@@ -93,15 +93,30 @@ Admin → **Ads / Monetag**
 - ভিউ/লাইক
 - সাইট নাম, লোগো, ১৮+ টেক্সট, Terms / Privacy / DMCA / 2257
 
-## প্রোডাকশন ডিপ্লয়
+## প্রোডাকশন ডিপ্লয় (Cloudflare)
 
-সাইট স্ট্যাটিক — **Cloudflare Pages** বা Firebase Hosting।
+এটা **Vite React সাইট + `/api` Worker** — Hono Node server নয়। Root এ `wrangler.jsonc` আছে।
 
-```bash
-npm run build
+1. GitHub repo `devabhai-1/feedboss` Cloudflare Workers/Pages এ কানেক্ট করুন।
+2. Worker name: `feedboss1`
+3. Build command: `npm run build`
+4. Root directory: `/` (repo root)
+5. Build environment variables (Vite):
+
+```
+VITE_FIREBASE_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN
+VITE_FIREBASE_PROJECT_ID
+VITE_FIREBASE_STORAGE_BUCKET
+VITE_FIREBASE_MESSAGING_SENDER_ID
+VITE_FIREBASE_APP_ID
+VITE_R2_WORKER_URL=/api
 ```
 
-`dist/` আপলোড করুন। Pages এ `.env` ভেরিয়েবলও সেট করুন।
+R2 bucket `feedboss` wrangler.jsonc তে bind আছে। Auto-detect Hono **Ignore** করুন — config ফাইলই কাফী।
+
+লোকাল: `npm run dev`  
+প্রোডাকশন: `npm run deploy`
 
 ## স্ট্রাকচার
 
