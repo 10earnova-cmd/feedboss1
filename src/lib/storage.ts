@@ -227,7 +227,7 @@ export async function uploadHlsPack(opts: {
   return { url: playlistUrl, key: playlistKey, duration }
 }
 
-export function captureThumb(videoEl: HTMLVideoElement, maxW = 720): Promise<Blob> {
+export function captureThumb(videoEl: HTMLVideoElement, maxW = 640): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const vw = videoEl.videoWidth || 1280
     const vh = videoEl.videoHeight || 720
@@ -247,7 +247,7 @@ export function captureThumb(videoEl: HTMLVideoElement, maxW = 720): Promise<Blo
         else resolve(blob)
       },
       'image/jpeg',
-      0.78,
+      0.72,
     )
   })
 }
@@ -259,29 +259,33 @@ export function seekVideo(video: HTMLVideoElement, time: number) {
       if (settled) return
       settled = true
       video.removeEventListener('seeked', finish)
+      video.removeEventListener('error', finish)
       resolve()
     }
-    if (Math.abs((video.currentTime || 0) - time) < 0.08 && video.readyState >= 2) {
+    if (Math.abs((video.currentTime || 0) - time) < 0.12 && video.readyState >= 2) {
       resolve()
       return
     }
     video.addEventListener('seeked', finish)
+    video.addEventListener('error', finish)
     try {
-      video.currentTime = time
+      video.currentTime = Math.min(Math.max(0.1, time), Math.max(0.1, (video.duration || time) - 0.25))
     } catch {
       finish()
       return
     }
-    window.setTimeout(finish, 2000)
+    // Mid-file seeks on long MP4s need more time than early frames.
+    window.setTimeout(finish, 8000)
   })
 }
 
 export async function captureScenes(video: HTMLVideoElement, percents = SCENE_PCTS): Promise<Blob[]> {
   const dur = video.duration
-  const pts = Number.isFinite(dur) && dur > 0 ? percents : [0.1]
+  const pts = Number.isFinite(dur) && dur > 0 ? percents : [0.5]
   const blobs: Blob[] = []
   for (const p of pts) {
     await seekVideo(video, sceneTime(dur, p))
+    if (video.readyState < 2) await new Promise((r) => window.setTimeout(r, 120))
     blobs.push(await captureThumb(video))
   }
   return blobs

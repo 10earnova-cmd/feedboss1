@@ -1,6 +1,8 @@
-export const SCENE_PCTS = [0.1, 0.28, 0.46, 0.64, 0.82]
+/** Main poster = exact middle of the video (50%). Extra frames for hover rotate. */
+export const POSTER_PCT = 0.5
+export const SCENE_PCTS = [0.5, 0.25, 0.75]
 
-export function sceneTime(duration?: number, pct = 0.1) {
+export function sceneTime(duration?: number, pct = POSTER_PCT) {
   if (!duration || !Number.isFinite(duration) || duration <= 0) return 2
   return Math.min(duration * 0.96, Math.max(0.12, duration * pct))
 }

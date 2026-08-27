@@ -28,11 +28,12 @@ export function BulkUpload() {
 
   const queued = rows.filter((r) => r.status === 'queued' || r.status === 'error').length
   const done = rows.filter((r) => r.status === 'done').length
-  const working = rows.find((r) => r.status === 'working')
+  const working = rows.filter((r) => r.status === 'working')
 
   const summary = useMemo(() => {
     if (!rows.length) return ''
-    return `${done}/${rows.length} published${working ? ` · now ${working.file.name}` : ''}`
+    const names = working.map((w) => w.file.name).join(', ')
+    return `${done}/${rows.length} published${names ? ` · now ${names}` : ''}`
   }, [rows, done, working])
 
   const addFiles = (list: File[]) => {
@@ -73,9 +74,12 @@ export function BulkUpload() {
     const priv = await db.getPrivateSettings()
     const secret = priv.uploadSecret || settings.uploadSecret || import.meta.env.VITE_R2_UPLOAD_SECRET || ''
 
+    const CONCURRENCY = 2
     let ok = 0
     let fail = 0
-    for (const row of pending) {
+    let cursor = 0
+
+    const runOne = async (row: (typeof pending)[number]) => {
       patch(row.id, { status: 'working', progress: 1, error: '' })
       try {
         const saved = await publishVideoFile({
@@ -98,6 +102,15 @@ export function BulkUpload() {
         })
       }
     }
+
+    const workers = Array.from({ length: Math.min(CONCURRENCY, pending.length) }, async () => {
+      while (cursor < pending.length) {
+        const i = cursor
+        cursor += 1
+        await runOne(pending[i])
+      }
+    })
+    await Promise.all(workers)
     await refresh()
     setBusy(false)
     setMsg(`${ok} published${fail ? `, ${fail} failed` : ''}`)
@@ -108,7 +121,7 @@ export function BulkUpload() {
       <Seo title="Bulk upload | Admin" />
       <h1 className="text-2xl font-bold">Bulk upload</h1>
       <p className="mt-1 text-sm text-muted">
-        Select many MP4 / WebM files at once. Each one gets a caption from the filename, then poster and scenes from the video. Files go to R2 one after another.
+        Select many MP4 / WebM files at once. Poster comes from the middle of each video (50%). Upload and poster run together for speed.
       </p>
       <p className="mt-2 text-sm">
         <Link className="text-accent" to="/admin">
@@ -181,7 +194,7 @@ export function BulkUpload() {
 
       <div className="mt-6 flex flex-wrap gap-2">
         <button className="btn btn-primary" type="button" disabled={busy || !queued} onClick={() => void start()}>
-          {busy ? `Uploading ${working?.progress || 0}%` : `Publish ${queued} video${queued === 1 ? '' : 's'}`}
+          {busy ? `Uploading…` : `Publish ${queued} video${queued === 1 ? '' : 's'}`}
         </button>
         <button
           className="btn btn-ghost"

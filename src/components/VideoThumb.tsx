@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatDuration } from '../lib/format'
-import { isHlsUrl, mediaCrossOrigin, SCENE_PCTS, sceneTime, usablePoster, videoFrameUrl } from '../lib/media'
+import { isHlsUrl, mediaCrossOrigin, POSTER_PCT, SCENE_PCTS, sceneTime, usablePoster, videoFrameUrl } from '../lib/media'
 
 let liveSeekers = 0
 const MAX_SEEKERS = 4
@@ -23,12 +23,20 @@ export function VideoThumb({
   const [inView, setInView] = useState(false)
   const [hover, setHover] = useState(false)
   const [frame, setFrame] = useState(0)
+  const [posterBroken, setPosterBroken] = useState(false)
 
-  const photos = uniqueFrames(poster, scenes)
-  const t10 = sceneTime(duration, 0.1)
-  const canSeek = Boolean(preview && src && !isHlsUrl(src))
+  const photos = posterBroken ? [] : uniqueFrames(poster, scenes)
+  const mid = sceneTime(duration, POSTER_PCT)
+  const canSeek = Boolean(src && !isHlsUrl(src))
   const usePhotos = photos.length > 0
   const cyclePhotos = preview && inView && photos.length > 1
+  // If R2 thumb 404s / missing, paint a real mid-frame from the video.
+  const needVideoPoster = Boolean(inView && canSeek && !usePhotos)
+
+  useEffect(() => {
+    setPosterBroken(false)
+    setFrame(0)
+  }, [poster, src])
 
   useEffect(() => {
     const el = box.current
@@ -55,14 +63,24 @@ export function VideoThumb({
 
   useEffect(() => {
     const v = vid.current
-    if (!v || !canSeek || hover) return
-    if (!inView || usePhotos) return
-    if (liveSeekers >= MAX_SEEKERS) return
+    if (!v || !canSeek) return
+    if (!needVideoPoster && !(preview && hover && inView)) return
+    if (liveSeekers >= MAX_SEEKERS && !hover) return
     liveSeekers += 1
-    let i = 0
     let gone = false
-    const tick = () => {
+    let i = 0
+
+    const seekMid = () => {
       if (gone || !v) return
+      try {
+        v.currentTime = mid
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const tick = () => {
+      if (gone || !v || !preview) return
       try {
         v.currentTime = sceneTime(duration || v.duration, SCENE_PCTS[i % SCENE_PCTS.length])
       } catch {
@@ -70,16 +88,18 @@ export function VideoThumb({
       }
       i += 1
     }
-    tick()
-    const id = window.setInterval(tick, 1400)
+
+    seekMid()
+    const id = preview && !usePhotos ? window.setInterval(tick, 1400) : 0
     return () => {
       gone = true
-      window.clearInterval(id)
+      if (id) window.clearInterval(id)
       liveSeekers = Math.max(0, liveSeekers - 1)
     }
-  }, [canSeek, hover, inView, usePhotos, duration])
+  }, [canSeek, needVideoPoster, hover, inView, preview, usePhotos, duration, mid])
 
   const playVideo = Boolean(hover && preview && inView && src && !isHlsUrl(src))
+  const showVideo = playVideo || needVideoPoster
 
   const onEnter = () => {
     if (!preview) return
@@ -95,7 +115,7 @@ export function VideoThumb({
     if (!v) return
     v.pause()
     try {
-      v.currentTime = t10
+      v.currentTime = mid
     } catch {
       /* ignore */
     }
@@ -105,11 +125,21 @@ export function VideoThumb({
 
   return (
     <div ref={box} className="thumb" onMouseEnter={onEnter} onMouseLeave={onLeave}>
-      {photo ? <img src={photo} alt="" loading="lazy" className="thumb-scene on" /> : <div className="thumb-empty" />}
-      {playVideo || (canSeek && inView && !usePhotos) ? (
+      {photo && !posterBroken ? (
+        <img
+          src={photo}
+          alt=""
+          loading="lazy"
+          className="thumb-scene on"
+          onError={() => setPosterBroken(true)}
+        />
+      ) : (
+        <div className="thumb-empty" />
+      )}
+      {showVideo ? (
         <video
           ref={vid}
-          src={videoFrameUrl(src, t10)}
+          src={videoFrameUrl(src, mid)}
           crossOrigin={mediaCrossOrigin(src)}
           muted
           loop

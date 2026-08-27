@@ -86,7 +86,7 @@ export function VideoEdit() {
     let cancelled = false
     let started = false
     const run = async () => {
-      setMsg('Taking poster and scenes from the video…')
+      setMsg('Taking mid-point poster (50%) and scenes from the video…')
       try {
         const blobs = await captureScenes(el)
         if (cancelled || !blobs.length) return
@@ -192,16 +192,16 @@ export function VideoEdit() {
       }
 
       if (sceneFiles.length) {
-        previewUrls = []
-        for (const file of sceneFiles) {
-          const up = await uploadMedia({
-            file,
-            folder: 'thumbs',
-            workerUrl,
-            uploadSecret: secret,
-          })
-          previewUrls.push(up.url)
-        }
+        previewUrls = await Promise.all(
+          sceneFiles.map((file) =>
+            uploadMedia({
+              file,
+              folder: 'thumbs',
+              workerUrl,
+              uploadSecret: secret,
+            }).then((up) => up.url),
+          ),
+        )
         if (previewUrls[0]) thumbnailUrl = previewUrls[0]
       }
 
@@ -240,7 +240,7 @@ export function VideoEdit() {
     <form onSubmit={(e) => void onSave(e)} className="mx-auto max-w-xl">
       <Seo title={isNew ? 'Upload' : 'Edit video'} />
       <h1 className="text-2xl font-bold">{isNew ? 'Upload' : 'Edit video'}</h1>
-      <p className="mt-1 text-sm text-muted">Select a video and add a caption. Poster and scenes come from the file automatically.</p>
+      <p className="mt-1 text-sm text-muted">Select a video and add a caption. Poster is taken from the middle of the video (50%).</p>
       {isNew ? (
         <p className="mt-2 text-sm">
           <Link className="text-accent" to="/admin/bulk">
@@ -271,7 +271,7 @@ export function VideoEdit() {
           className="mt-4 aspect-video w-full rounded-xl bg-black"
           muted
           playsInline
-          crossOrigin={previewSrc.startsWith('blob:') ? undefined : mediaCrossOrigin(form.videoUrl)}
+          crossOrigin={previewSrc.startsWith('blob:') ? undefined : mediaCrossOrigin(form.videoUrl || previewSrc)}
           src={previewSrc || form.videoUrl}
         />
       ) : null}

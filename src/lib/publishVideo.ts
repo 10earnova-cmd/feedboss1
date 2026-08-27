@@ -1,5 +1,5 @@
 import { db, newId } from './db'
-import { sceneTime, SCENE_PCTS } from './media'
+import { POSTER_PCT, SCENE_PCTS, sceneTime } from './media'
 import { slugify, uniqueSlug } from './slug'
 import { captureThumb, captureScenes, seekVideo, uploadMedia } from './storage'
 import type { Video } from '../types'
@@ -13,36 +13,45 @@ export function isBulkVideoFile(file: File) {
   return name.endsWith('.mp4') || name.endsWith('.webm') || file.type.includes('mp4') || file.type.includes('webm')
 }
 
-async function scenesFromFile(file: File): Promise<{ duration: number; scenes: File[] }> {
+async function waitMeta(video: HTMLVideoElement) {
+  if (Number.isFinite(video.duration) && video.duration > 0 && video.readyState >= 1) return
+  await new Promise<void>((resolve, reject) => {
+    const timer = window.setTimeout(() => resolve(), 15000)
+    const ok = () => {
+      window.clearTimeout(timer)
+      resolve()
+    }
+    video.addEventListener('loadedmetadata', ok, { once: true })
+    video.addEventListener('loadeddata', ok, { once: true })
+    video.addEventListener('error', () => {
+      window.clearTimeout(timer)
+      reject(new Error('Could not read video'))
+    }, { once: true })
+  })
+}
+
+/** Poster from exact mid-point (50%). Extra rotate frames optional. */
+async function scenesFromFile(file: File, fullScenes: boolean): Promise<{ duration: number; scenes: File[] }> {
   const url = URL.createObjectURL(file)
   const video = document.createElement('video')
   video.muted = true
   video.playsInline = true
   video.preload = 'auto'
-  video.crossOrigin = 'anonymous'
+  // blob: URLs must not set crossOrigin or canvas capture can fail
   video.src = url
   video.style.cssText = 'position:fixed;left:-9999px;width:16px;height:9px;opacity:0;pointer-events:none'
   document.body.appendChild(video)
 
   try {
-    await new Promise<void>((resolve, reject) => {
-      const timer = window.setTimeout(() => resolve(), 12000)
-      video.onloadeddata = () => {
-        window.clearTimeout(timer)
-        resolve()
-      }
-      video.onerror = () => {
-        window.clearTimeout(timer)
-        reject(new Error('Could not read video'))
-      }
-    })
+    await waitMeta(video)
     const duration = Math.round(video.duration || 0)
+    const pts = fullScenes ? SCENE_PCTS : [POSTER_PCT]
     let blobs: Blob[] = []
     try {
-      blobs = await captureScenes(video, duration > 0 ? SCENE_PCTS : [0.1])
+      blobs = await captureScenes(video, duration > 0 ? pts : [POSTER_PCT])
     } catch {
       try {
-        await seekVideo(video, sceneTime(duration, 0.1))
+        await seekVideo(video, sceneTime(duration, POSTER_PCT))
         blobs = [await captureThumb(video)]
       } catch {
         blobs = []
@@ -58,6 +67,27 @@ async function scenesFromFile(file: File): Promise<{ duration: number; scenes: F
   }
 }
 
+async function uploadAllThumbs(
+  scenes: File[],
+  workerUrl: string,
+  uploadSecret: string,
+  onEach?: (done: number, total: number) => void,
+) {
+  if (!scenes.length) return [] as string[]
+  const ups = await Promise.all(
+    scenes.map((file) =>
+      uploadMedia({
+        file,
+        folder: 'thumbs',
+        workerUrl,
+        uploadSecret,
+      }),
+    ),
+  )
+  onEach?.(scenes.length, scenes.length)
+  return ups.map((u) => u.url)
+}
+
 export async function publishVideoFile(opts: {
   file: File
   caption: string
@@ -68,30 +98,27 @@ export async function publishVideoFile(opts: {
 }): Promise<Video> {
   const text = opts.caption.trim()
   if (!text) throw new Error('Add a caption')
-  opts.onProgress?.(4)
+  opts.onProgress?.(3)
 
-  const { duration, scenes } = await scenesFromFile(opts.file)
-  opts.onProgress?.(10)
-
-  const videoUp = await uploadMedia({
+  // Upload the big video while grabbing the mid-point poster — big speed win.
+  let videoPct = 0
+  const videoTask = uploadMedia({
     file: opts.file,
     folder: 'videos',
     workerUrl: opts.workerUrl,
     uploadSecret: opts.uploadSecret,
-    onProgress: (pct) => opts.onProgress?.(10 + Math.round(pct * 0.7)),
+    onProgress: (pct) => {
+      videoPct = pct
+      opts.onProgress?.(5 + Math.round(pct * 0.75))
+    },
   })
+  const scenesTask = scenesFromFile(opts.file, false)
 
-  const previewUrls: string[] = []
-  for (let i = 0; i < scenes.length; i += 1) {
-    const up = await uploadMedia({
-      file: scenes[i],
-      folder: 'thumbs',
-      workerUrl: opts.workerUrl,
-      uploadSecret: opts.uploadSecret,
-    })
-    previewUrls.push(up.url)
-    opts.onProgress?.(80 + Math.round(((i + 1) / Math.max(scenes.length, 1)) * 18))
-  }
+  const [videoUp, { duration, scenes }] = await Promise.all([videoTask, scenesTask])
+  opts.onProgress?.(Math.max(82, 5 + Math.round(videoPct * 0.75)))
+
+  const previewUrls = await uploadAllThumbs(scenes, opts.workerUrl, opts.uploadSecret)
+  opts.onProgress?.(96)
 
   const now = Date.now()
   const payload: Video = {
