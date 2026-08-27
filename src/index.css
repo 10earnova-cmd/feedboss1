@@ -395,6 +395,11 @@ a {
   background: #000;
 }
 
+.player-feed-ad {
+  display: block;
+  margin-top: 10px;
+}
+
 .watch-side-item {
   display: flex;
   gap: 8px;

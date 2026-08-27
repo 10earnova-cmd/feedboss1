@@ -1,6 +1,7 @@
 import { Heart, Share2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { BelowPlayerPoster } from '../components/BelowPlayerPoster'
 import { PosterLink } from '../components/PosterLink'
 import { Seo } from '../components/Seo'
 import { VideoGrid } from '../components/VideoGrid'
@@ -59,6 +60,7 @@ export function Watch() {
       <Seo title={`${title} | FeedBoss`} description={caption} />
       <div>
         <VideoPlayer src={video.videoUrl} poster={usablePoster(video.thumbnailUrl)} title={title} />
+        <BelowPlayerPoster currentId={video.id} />
         <h1 className="mt-4 text-xl font-bold sm:text-2xl">{title}</h1>
         <p className="mt-2 text-sm text-muted">
           {formatViews(video.views + 1, lang)} {tr('views', lang)} · {formatDate(video.createdAt, lang)}
