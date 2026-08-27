@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatDuration } from '../lib/format'
 import { isHlsUrl, mediaCrossOrigin, POSTER_PCT, SCENE_PCTS, sceneTime, usablePoster, videoFrameUrl } from '../lib/media'
+import { isPosterWarm, markPosterLoaded } from '../lib/posterCache'
 
 let liveSeekers = 0
 const MAX_SEEKERS = 4
@@ -30,8 +31,9 @@ export function VideoThumb({
   const canSeek = Boolean(src && !isHlsUrl(src))
   const usePhotos = photos.length > 0
   const cyclePhotos = preview && inView && photos.length > 1
-  // If R2 thumb 404s / missing, paint a real mid-frame from the video.
   const needVideoPoster = Boolean(inView && canSeek && !usePhotos)
+  const photo = photos[frame] || photos[0] || usablePoster(poster)
+  const warm = isPosterWarm(photo)
 
   useEffect(() => {
     setPosterBroken(false)
@@ -121,16 +123,16 @@ export function VideoThumb({
     }
   }
 
-  const photo = photos[frame] || photos[0] || usablePoster(poster)
-
   return (
     <div ref={box} className="thumb" onMouseEnter={onEnter} onMouseLeave={onLeave}>
       {photo && !posterBroken ? (
         <img
           src={photo}
           alt=""
-          loading="lazy"
+          loading={warm ? 'eager' : 'lazy'}
+          decoding="async"
           className="thumb-scene on"
+          onLoad={() => markPosterLoaded(photo)}
           onError={() => setPosterBroken(true)}
         />
       ) : (
