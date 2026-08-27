@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Seo } from '../../components/Seo'
 import { useSite } from '../../context/SiteContext'
 import { db, newId } from '../../lib/db'
-import { isHlsUrl, mediaCrossOrigin, parseHlsDuration, pickHlsPlaylist } from '../../lib/media'
+import { isHlsUrl, mediaCrossOrigin, parseHlsDuration, pickHlsPlaylist, VIDEO_ACCEPT, isVideoFile } from '../../lib/media'
 import { captureScenes, readVideoMeta, uploadHlsPack, uploadMedia } from '../../lib/storage'
 import { slugify, uniqueSlug } from '../../lib/slug'
 import type { Video } from '../../types'
@@ -136,8 +136,12 @@ export function VideoEdit() {
       setMsg('For many videos at once, open Bulk upload.')
       return
     }
-    const file = files.find((f) => /\.(mp4|webm)$/i.test(f.name)) || files[0]
+    const file = files.find((f) => isVideoFile(f)) || files[0]
     if (!file) return
+    if (!isVideoFile(file)) {
+      setMsg('Pick a video file (mp4, mov, mkv, avi, webm, …)')
+      return
+    }
     setHlsFiles([])
     setVideoFile(file)
     if (localUrl.current) URL.revokeObjectURL(localUrl.current)
@@ -148,8 +152,13 @@ export function VideoEdit() {
       const label = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')
       setForm((f) => (f ? { ...f, duration: meta.duration } : f))
       if (!caption.trim()) setCaption(label)
-    } catch (err) {
-      setMsg(err instanceof Error ? err.message : 'Could not read video')
+    } catch {
+      // Still allow upload even if this browser cannot decode the codec for preview/poster.
+      setVideoFile(file)
+      setPreviewSrc('')
+      const label = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')
+      if (!caption.trim()) setCaption(label)
+      setMsg('Browser cannot preview this format — file will still upload. Poster may be empty until re-encode to MP4.')
     }
   }
 
@@ -240,7 +249,7 @@ export function VideoEdit() {
     <form onSubmit={(e) => void onSave(e)} className="mx-auto max-w-xl">
       <Seo title={isNew ? 'Upload' : 'Edit video'} />
       <h1 className="text-2xl font-bold">{isNew ? 'Upload' : 'Edit video'}</h1>
-      <p className="mt-1 text-sm text-muted">Select a video and add a caption. Poster is taken from the middle of the video (50%).</p>
+      <p className="mt-1 text-sm text-muted">Any video format (mp4, mov, mkv, avi, webm, …). Poster comes from the middle when the browser can decode it.</p>
       {isNew ? (
         <p className="mt-2 text-sm">
           <Link className="text-accent" to="/admin/bulk">
@@ -255,7 +264,7 @@ export function VideoEdit() {
         className="input mt-1"
         type="file"
         multiple
-        accept=".m3u8,.ts,.m4s,.mp4,.webm,video/mp4,video/webm,application/vnd.apple.mpegurl"
+        accept={`${VIDEO_ACCEPT},.m3u8,.ts,.m4s,application/vnd.apple.mpegurl`}
         onChange={(e) => {
           const files = e.target.files
           if (files?.length) void onPickFiles([...files])

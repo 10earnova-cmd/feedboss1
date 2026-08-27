@@ -4,6 +4,7 @@ import { Seo } from '../../components/Seo'
 import { useSite } from '../../context/SiteContext'
 import { db } from '../../lib/db'
 import { captionFromFilename, isBulkVideoFile, publishVideoFile } from '../../lib/publishVideo'
+import { VIDEO_ACCEPT } from '../../lib/media'
 
 type Row = {
   id: string
@@ -50,7 +51,7 @@ export function BulkUpload() {
       }
       return [...prev, ...extra]
     })
-    setMsg(skipped ? `${skipped} file(s) skipped — use MP4 or WebM` : '')
+    setMsg(skipped ? `${skipped} file(s) skipped — not a video` : '')
   }
 
   const patch = (id: string, next: Partial<Row>) => {
@@ -121,7 +122,7 @@ export function BulkUpload() {
       <Seo title="Bulk upload | Admin" />
       <h1 className="text-2xl font-bold">Bulk upload</h1>
       <p className="mt-1 text-sm text-muted">
-        Select many MP4 / WebM files at once. Poster comes from the middle of each video (50%). Upload and poster run together for speed.
+        Select any video format (mp4, mov, mkv, avi, webm, …). Poster comes from the middle when the browser can decode it. Upload and poster run together for speed.
       </p>
       <p className="mt-2 text-sm">
         <Link className="text-accent" to="/admin">
@@ -144,14 +145,14 @@ export function BulkUpload() {
           className="hidden"
           type="file"
           multiple
-          accept=".mp4,.webm,video/mp4,video/webm"
+          accept={VIDEO_ACCEPT}
           onChange={(e) => {
             const files = e.target.files
             if (files?.length) addFiles([...files])
             e.target.value = ''
           }}
         />
-        Drop videos here, or click to pick many files
+        Drop any videos here, or click to pick many files
       </label>
 
       {rows.length > 0 ? (

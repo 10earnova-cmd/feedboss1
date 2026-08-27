@@ -2,6 +2,88 @@
 export const POSTER_PCT = 0.5
 export const SCENE_PCTS = [0.5, 0.25, 0.75]
 
+/** Common video containers accepted for upload (browser may not play every codec). */
+export const VIDEO_EXTENSIONS = [
+  'mp4',
+  'webm',
+  'mov',
+  'm4v',
+  'mkv',
+  'avi',
+  'wmv',
+  'flv',
+  'mpeg',
+  'mpg',
+  'mpe',
+  'mp2',
+  'm2v',
+  '3gp',
+  '3g2',
+  'ogv',
+  'ogg',
+  'ts',
+  'mts',
+  'm2ts',
+  'vob',
+  'asf',
+  'f4v',
+  'rm',
+  'rmvb',
+  'divx',
+] as const
+
+const VIDEO_EXT_RE = new RegExp(`\\.(${VIDEO_EXTENSIONS.join('|')})$`, 'i')
+
+export const VIDEO_ACCEPT =
+  'video/*,.mp4,.webm,.mov,.m4v,.mkv,.avi,.wmv,.flv,.mpeg,.mpg,.3gp,.3g2,.ogv,.ogg,.ts,.mts,.m2ts,.vob,.asf,.f4v,.m3u8,.m4s'
+
+export function videoExt(nameOrUrl?: string) {
+  if (!nameOrUrl) return ''
+  const base = nameOrUrl.split('?')[0].split('#')[0]
+  const m = base.match(/\.([a-z0-9]{1,5})$/i)
+  return (m?.[1] || '').toLowerCase()
+}
+
+export function isVideoFile(file: File) {
+  if (file.type.startsWith('video/')) return true
+  const name = file.name.toLowerCase()
+  if (VIDEO_EXT_RE.test(name)) return true
+  if (name.endsWith('.m3u8') || name.endsWith('.m4s')) return true
+  return false
+}
+
+export function mimeForVideoExt(ext: string, fallback = 'application/octet-stream') {
+  const e = ext.toLowerCase().replace(/^\./, '')
+  const map: Record<string, string> = {
+    mp4: 'video/mp4',
+    m4v: 'video/x-m4v',
+    webm: 'video/webm',
+    mov: 'video/quicktime',
+    mkv: 'video/x-matroska',
+    avi: 'video/x-msvideo',
+    wmv: 'video/x-ms-wmv',
+    flv: 'video/x-flv',
+    mpeg: 'video/mpeg',
+    mpg: 'video/mpeg',
+    mpe: 'video/mpeg',
+    mp2: 'video/mpeg',
+    m2v: 'video/mpeg',
+    '3gp': 'video/3gpp',
+    '3g2': 'video/3gpp2',
+    ogv: 'video/ogg',
+    ogg: 'video/ogg',
+    ts: 'video/MP2T',
+    mts: 'video/MP2T',
+    m2ts: 'video/MP2T',
+    m4s: 'video/iso.segment',
+    m3u8: 'application/vnd.apple.mpegurl',
+    vob: 'video/dvd',
+    asf: 'video/x-ms-asf',
+    f4v: 'video/x-f4v',
+  }
+  return map[e] || fallback
+}
+
 export function sceneTime(duration?: number, pct = POSTER_PCT) {
   if (!duration || !Number.isFinite(duration) || duration <= 0) return 2
   return Math.min(duration * 0.96, Math.max(0.12, duration * pct))

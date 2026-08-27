@@ -1,4 +1,4 @@
-import { parseHlsDuration, pickHlsPlaylist, rewriteHlsPlaylist, hlsRelativePath, sanitizeHlsPath, SCENE_PCTS, sceneTime } from './media'
+import { parseHlsDuration, pickHlsPlaylist, rewriteHlsPlaylist, hlsRelativePath, sanitizeHlsPath, SCENE_PCTS, sceneTime, mimeForVideoExt, videoExt } from './media'
 import { auth } from './firebase'
 
 export type UploadProgress = (pct: number) => void
@@ -6,10 +6,17 @@ export type UploadProgress = (pct: number) => void
 function extOf(file: File) {
   const fromName = file.name.split('.').pop()?.toLowerCase()
   if (fromName && /^[a-z0-9]+$/.test(fromName) && fromName.length <= 5) return fromName
-  if (file.type.includes('mp4')) return 'mp4'
+  if (file.type.includes('quicktime')) return 'mov'
+  if (file.type.includes('matroska')) return 'mkv'
+  if (file.type.includes('msvideo') || file.type.includes('avi')) return 'avi'
+  if (file.type.includes('mp4') || file.type.includes('m4v')) return 'mp4'
   if (file.type.includes('mpegurl') || file.name.toLowerCase().endsWith('.m3u8')) return 'm3u8'
   if (file.type.includes('mp2t') || file.name.toLowerCase().endsWith('.ts')) return 'ts'
   if (file.type.includes('webm')) return 'webm'
+  if (file.type.includes('ogg')) return 'ogv'
+  if (file.type.includes('3gpp2')) return '3g2'
+  if (file.type.includes('3gpp')) return '3gp'
+  if (file.type.startsWith('video/')) return 'mp4'
   if (file.type.includes('png')) return 'png'
   if (file.type.includes('webp')) return 'webp'
   if (file.type.includes('jpeg') || file.type.includes('jpg')) return 'jpg'
@@ -39,14 +46,8 @@ function publicMediaUrl(workerUrl: string, key: string, returned?: string) {
 }
 
 function contentTypeOf(file: File, key: string) {
-  if (file.type) return file.type
-  const lower = key.toLowerCase()
-  if (lower.endsWith('.m3u8')) return 'application/vnd.apple.mpegurl'
-  if (lower.endsWith('.ts')) return 'video/MP2T'
-  if (lower.endsWith('.mp4')) return 'video/mp4'
-  if (lower.endsWith('.webm')) return 'video/webm'
-  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg'
-  return 'application/octet-stream'
+  if (file.type && file.type !== 'application/octet-stream') return file.type
+  return mimeForVideoExt(videoExt(key) || videoExt(file.name), 'application/octet-stream')
 }
 
 function putFile(url: string, file: File, contentType: string, onProgress?: UploadProgress) {

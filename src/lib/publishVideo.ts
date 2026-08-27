@@ -1,5 +1,5 @@
 import { db, newId } from './db'
-import { POSTER_PCT, SCENE_PCTS, sceneTime } from './media'
+import { POSTER_PCT, SCENE_PCTS, sceneTime, isVideoFile } from './media'
 import { slugify, uniqueSlug } from './slug'
 import { captureThumb, captureScenes, seekVideo, uploadMedia } from './storage'
 import type { Video } from '../types'
@@ -9,8 +9,10 @@ export function captionFromFilename(file: File) {
 }
 
 export function isBulkVideoFile(file: File) {
+  // HLS packs use the single-upload page; bulk is whole video files.
   const name = file.name.toLowerCase()
-  return name.endsWith('.mp4') || name.endsWith('.webm') || file.type.includes('mp4') || file.type.includes('webm')
+  if (name.endsWith('.m3u8') || name.endsWith('.m4s')) return false
+  return isVideoFile(file)
 }
 
 async function waitMeta(video: HTMLVideoElement) {
