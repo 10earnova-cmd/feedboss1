@@ -1,5 +1,4 @@
 import {
-  createUserWithEmailAndPassword,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
@@ -18,7 +17,6 @@ type Ctx = {
   loading: boolean
   firebaseOn: boolean
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -93,20 +91,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser({ uid: cred.user.uid, email: cred.user.email || '' })
   }
 
-  const register = async (email: string, password: string) => {
-    if (!firebaseEnabled || !auth) {
-      throw new Error('Connect Firebase to create a new admin.')
-    }
-    const cred = await createUserWithEmailAndPassword(auth, email, password)
-    await ensureAdminDoc(cred.user)
-    const allowed = await isAdminUser(cred.user)
-    if (!allowed) {
-      await signOut(auth)
-      throw new Error('Account created but this email is not an admin. Set VITE_ADMIN_EMAIL to this email.')
-    }
-    setUser({ uid: cred.user.uid, email: cred.user.email || '' })
-  }
-
   const logout = async () => {
     sessionStorage.removeItem(DEMO_KEY)
     if (auth) await signOut(auth)
@@ -114,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const value = useMemo(
-    () => ({ user, loading, firebaseOn: firebaseEnabled, login, register, logout }),
+    () => ({ user, loading, firebaseOn: firebaseEnabled, login, logout }),
     [user, loading],
   )
 
