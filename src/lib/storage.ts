@@ -1,6 +1,5 @@
 import { parseHlsDuration, pickHlsPlaylist, rewriteHlsPlaylist, hlsRelativePath, sanitizeHlsPath, SCENE_PCTS, sceneTime } from './media'
-import { auth, storage } from './firebase'
-import { getDownloadURL, ref as storageRef, uploadBytesResumable } from 'firebase/storage'
+import { auth } from './firebase'
 
 export type UploadProgress = (pct: number) => void
 
@@ -20,15 +19,6 @@ function extOf(file: File) {
 export function mediaApiUrl(workerUrl?: string) {
   const raw = (workerUrl || import.meta.env.VITE_R2_WORKER_URL || '/api').trim()
   return raw.replace(/\/$/, '') || '/api'
-}
-
-function shouldUseFirebaseStorage(workerUrl: string) {
-  if (!storage || !auth?.currentUser) return false
-  if (/^https?:\/\//i.test(workerUrl) && !/getvideo\.fun/i.test(workerUrl)) return false
-  if (typeof window === 'undefined') return Boolean(import.meta.env.PROD)
-  const host = window.location.hostname
-  if (host === 'localhost' || host === '127.0.0.1') return false
-  return true
 }
 
 function publicMediaUrl(workerUrl: string, key: string, returned?: string) {
@@ -59,38 +49,21 @@ function contentTypeOf(file: File, key: string) {
   return 'application/octet-stream'
 }
 
-function uploadToFirebase(opts: {
-  file: File
-  key: string
-  onProgress?: UploadProgress
-}): Promise<{ url: string; key: string }> {
-  if (!storage) return Promise.reject(new Error('Firebase Storage is not configured'))
-  const object = storageRef(storage, opts.key)
-  const task = uploadBytesResumable(object, opts.file, {
-    contentType: contentTypeOf(opts.file, opts.key),
-    cacheControl: 'public,max-age=31536000',
-  })
-  return new Promise((resolve, reject) => {
-    task.on(
-      'state_changed',
-      (snap) => {
-        if (snap.totalBytes && opts.onProgress) {
-          opts.onProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100))
-        }
-      },
-      (err) => {
-        const code = (err as { code?: string }).code || ''
-        if (code.includes('unauthorized') || code.includes('unauthenticated')) {
-          reject(new Error('Storage permission denied. In Firebase Console → Storage → Rules, allow read for all and write for the admin email.'))
-          return
-        }
-        reject(err)
-      },
-      async () => {
-        const url = await getDownloadURL(task.snapshot.ref)
-        resolve({ url, key: opts.key })
-      },
-    )
+function putFile(url: string, file: File, contentType: string, onProgress?: UploadProgress) {
+  return new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', url)
+    xhr.setRequestHeader('Content-Type', contentType)
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100))
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve()
+      else reject(new Error(`R2 upload failed (${xhr.status})`))
+    }
+    xhr.onerror = () =>
+      reject(new Error('R2 CORS/network error. In Cloudflare → R2 → feedboss → Settings → CORS Policy, paste r2-cors.json'))
+    xhr.send(file)
   })
 }
 
@@ -103,7 +76,6 @@ export async function uploadMedia(opts: {
   onProgress?: UploadProgress
 }): Promise<{ url: string; key: string }> {
   const workerUrl = mediaApiUrl(opts.workerUrl)
-
   const token = auth?.currentUser ? await auth.currentUser.getIdToken() : opts.uploadSecret
   const bearer = token || opts.uploadSecret
   if (!bearer) {
@@ -111,9 +83,32 @@ export async function uploadMedia(opts: {
   }
 
   const keyHint = opts.key || `${opts.folder}/${crypto.randomUUID()}.${extOf(opts.file)}`
+  const contentType = contentTypeOf(opts.file, keyHint)
 
-  if (shouldUseFirebaseStorage(workerUrl)) {
-    return uploadToFirebase({ file: opts.file, key: keyHint, onProgress: opts.onProgress })
+  const signRes = await fetch(`${workerUrl}/sign`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${bearer}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ key: keyHint, contentType }),
+  })
+  if (signRes.ok) {
+    const signed = (await signRes.json()) as { putUrl?: string; url?: string; key?: string; contentType?: string; error?: string }
+    if (!signed.putUrl) throw new Error(signed.error || 'Sign URL missing')
+    await putFile(signed.putUrl, opts.file, signed.contentType || contentType, opts.onProgress)
+    return { url: publicMediaUrl(workerUrl, signed.key || keyHint, signed.url), key: signed.key || keyHint }
+  }
+
+  let signError = `Sign failed (${signRes.status})`
+  try {
+    const err = (await signRes.json()) as { error?: string }
+    if (err?.error) signError = err.error
+  } catch {
+    /* ignore */
+  }
+  if (signRes.status !== 404 && signRes.status !== 405) {
+    throw new Error(signError)
   }
 
   return new Promise((resolve, reject) => {

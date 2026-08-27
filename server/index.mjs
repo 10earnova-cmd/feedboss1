@@ -1,51 +1,13 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { corsHeaderRecord, preflight } from './cors.js'
 import { cacheControlFor, contentTypeFor } from './media.js'
+import { bucket, getS3, safeKey, verifyFirebase } from './r2.js'
 
-const bucket = process.env.R2_BUCKET || 'feedboss'
-const endpoint = process.env.R2_ENDPOINT
-const accessKeyId = process.env.R2_ACCESS_KEY_ID
-const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY
-const firebaseKey = process.env.VITE_FIREBASE_API_KEY || ''
 const port = Number(process.env.API_PORT || 8788)
-
-if (!endpoint || !accessKeyId || !secretAccessKey) {
-  console.error('Missing R2_ENDPOINT / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY in .env')
-  process.exit(1)
-}
-
-const s3 = new S3Client({
-  region: 'auto',
-  endpoint,
-  credentials: { accessKeyId, secretAccessKey },
-  forcePathStyle: true,
-})
-
-const folders = new Set(['videos', 'thumbs', 'images'])
-
-function safeKey(raw) {
-  const key = String(raw || '')
-    .replace(/\\/g, '/')
-    .replace(/^\/+/, '')
-  if (!key || key.includes('..')) return ''
-  if (!/^[a-zA-Z0-9/_.\-]+$/.test(key)) return ''
-  const folder = key.split('/')[0]
-  if (!folders.has(folder)) return ''
-  return key
-}
-
-async function verifyFirebase(token) {
-  if (!token || !firebaseKey) return false
-  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ idToken: token }),
-  })
-  const data = await res.json()
-  return Boolean(data.users?.[0]?.localId)
-}
+const s3 = getS3()
 
 const app = new Hono()
 
@@ -62,6 +24,24 @@ app.onError((err, c) => {
 })
 
 app.get('/api/health', (c) => c.json({ ok: true, bucket }))
+
+app.post('/api/sign', async (c) => {
+  const header = c.req.header('Authorization') || ''
+  const token = header.replace(/^Bearer\s+/i, '').trim()
+  if (!(await verifyFirebase(token))) {
+    return c.json({ error: 'Unauthorized — admin login required' }, 401)
+  }
+  const body = await c.req.json().catch(() => ({}))
+  const key = safeKey(body.key)
+  if (!key) return c.json({ error: 'Invalid key' }, 400)
+  const contentType = contentTypeFor(key, body.contentType)
+  const putUrl = await getSignedUrl(
+    s3,
+    new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType }),
+    { expiresIn: 3600 },
+  )
+  return c.json({ putUrl, url: `/api/file/${key}`, key, contentType })
+})
 
 app.post('/api/upload', async (c) => {
   const header = c.req.header('Authorization') || ''
@@ -81,7 +61,7 @@ app.post('/api/upload', async (c) => {
   let key = requested.includes('/') ? safeKey(requested) : ''
   if (!key) {
     const folderRaw = typeof form.folder === 'string' ? form.folder : 'videos'
-    const folder = folders.has(folderRaw) ? folderRaw : 'videos'
+    const folder = folderRaw === 'thumbs' || folderRaw === 'images' ? folderRaw : 'videos'
     const base = (requested || file.name || 'file.bin').split('/').pop() || 'file.bin'
     key = safeKey(`${folder}/${Date.now()}-${base}`) || `${folder}/${Date.now()}.bin`
   }

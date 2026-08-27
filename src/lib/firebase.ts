@@ -1,7 +1,6 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app'
 import { getAuth, type Auth } from 'firebase/auth'
 import { getDatabase, type Database } from 'firebase/database'
-import { getStorage, type FirebaseStorage } from 'firebase/storage'
 
 const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || ''
 
@@ -22,16 +21,14 @@ export const firebaseEnabled = Boolean(config.apiKey && config.projectId && conf
 let app: FirebaseApp | null = null
 let auth: Auth | null = null
 let rtdb: Database | null = null
-let storage: FirebaseStorage | null = null
 
 if (firebaseEnabled) {
   app = initializeApp(config)
   auth = getAuth(app)
   rtdb = getDatabase(app, config.databaseURL)
-  if (config.storageBucket) storage = getStorage(app)
 }
 
-export { app, auth, rtdb, storage }
+export { app, auth, rtdb }
 
 const OWNER_EMAILS = ['am@gmail.com']
 
