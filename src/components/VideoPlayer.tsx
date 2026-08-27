@@ -10,6 +10,7 @@ export function VideoPlayer({ src, poster, title }: { src: string; poster: strin
     if (!video || !src) return
 
     if (!isHlsUrl(src)) {
+      video.preload = 'auto'
       video.src = src
       return () => {
         video.removeAttribute('src')
@@ -17,7 +18,9 @@ export function VideoPlayer({ src, poster, title }: { src: string; poster: strin
       }
     }
 
+    // Safari / iOS native HLS — nudge ahead buffering via preload.
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.preload = 'auto'
       video.src = src
       return () => {
         video.removeAttribute('src')
@@ -29,12 +32,30 @@ export function VideoPlayer({ src, poster, title }: { src: string; poster: strin
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
-        maxBufferLength: 30,
+        // Prefetch well ahead of playhead so the next chunks are already local.
+        maxBufferLength: 120,
+        maxMaxBufferLength: 360,
+        backBufferLength: 30,
+        maxBufferSize: 150 * 1000 * 1000,
+        maxBufferHole: 0.5,
+        highBufferWatchdogPeriod: 1,
+        nudgeMaxRetry: 8,
+        startFragPrefetch: true,
+        testBandwidth: true,
+        progressive: true,
         capLevelToPlayerSize: true,
         startLevel: -1,
       })
       hls.loadSource(src)
       hls.attachMedia(video)
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        // Kick fragment loader immediately even before play.
+        try {
+          hls.startLoad(-1)
+        } catch {
+          /* ignore */
+        }
+      })
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal) return
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad()
@@ -56,7 +77,7 @@ export function VideoPlayer({ src, poster, title }: { src: string; poster: strin
         playsInline
         crossOrigin={mediaCrossOrigin(src)}
         poster={poster || undefined}
-        preload="metadata"
+        preload="auto"
         title={title}
       />
     </div>

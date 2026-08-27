@@ -75,6 +75,7 @@ export function BulkUpload() {
     const priv = await db.getPrivateSettings()
     const secret = priv.uploadSecret || settings.uploadSecret || import.meta.env.VITE_R2_UPLOAD_SECRET || ''
 
+    // Transcode is serialized inside ffmpeg lock; keep 2 slots so next file can prep thumbs/upload wait.
     const CONCURRENCY = 2
     let ok = 0
     let fail = 0
@@ -122,7 +123,7 @@ export function BulkUpload() {
       <Seo title="Bulk upload | Admin" />
       <h1 className="text-2xl font-bold">Bulk upload</h1>
       <p className="mt-1 text-sm text-muted">
-        Select any video format (mp4, mov, mkv, avi, webm, …). Poster comes from the middle when the browser can decode it. Upload and poster run together for speed.
+        Select any video format. Each file is remuxed to HLS (quality kept when possible), then uploaded to Cloudflare. Player streams m3u8 with ahead buffering.
       </p>
       <p className="mt-2 text-sm">
         <Link className="text-accent" to="/admin">

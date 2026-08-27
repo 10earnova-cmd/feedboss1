@@ -200,21 +200,26 @@ export async function uploadHlsPack(opts: {
   const total = prepared.length
   const segments = prepared.filter((item) => !item.isPlaylist)
   const lists = prepared.filter((item) => item.isPlaylist)
+  const CONCURRENCY = 4
 
-  for (const item of segments) {
-    const up = await uploadMedia({
-      file: item.file,
-      folder: 'videos',
-      workerUrl: opts.workerUrl,
-      uploadSecret: opts.uploadSecret,
-      key: item.key,
-      onProgress: (pct) => opts.onProgress?.(Math.round(((done + pct / 100) / total) * 100)),
-    })
-    nameMap[item.original] = up.url
-    nameMap[item.file.name] = up.url
-    nameMap[item.key.split('/').pop() || item.file.name] = up.url
-    done += 1
-    opts.onProgress?.(Math.round((done / total) * 100))
+  for (let i = 0; i < segments.length; i += CONCURRENCY) {
+    const batch = segments.slice(i, i + CONCURRENCY)
+    await Promise.all(
+      batch.map(async (item) => {
+        const up = await uploadMedia({
+          file: item.file,
+          folder: 'videos',
+          workerUrl: opts.workerUrl,
+          uploadSecret: opts.uploadSecret,
+          key: item.key,
+        })
+        nameMap[item.original] = up.url
+        nameMap[item.file.name] = up.url
+        nameMap[item.key.split('/').pop() || item.file.name] = up.url
+        done += 1
+        opts.onProgress?.(Math.round((done / total) * 100))
+      }),
+    )
   }
 
   for (const item of lists) {

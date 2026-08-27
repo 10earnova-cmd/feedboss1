@@ -1,7 +1,8 @@
 import { db, newId } from './db'
 import { POSTER_PCT, SCENE_PCTS, sceneTime, isVideoFile } from './media'
 import { slugify, uniqueSlug } from './slug'
-import { captureThumb, captureScenes, seekVideo, uploadMedia } from './storage'
+import { captureThumb, captureScenes, seekVideo, uploadHlsPack, uploadMedia } from './storage'
+import { transcodeToHls } from './transcode'
 import type { Video } from '../types'
 
 export function captionFromFilename(file: File) {
@@ -9,7 +10,6 @@ export function captionFromFilename(file: File) {
 }
 
 export function isBulkVideoFile(file: File) {
-  // HLS packs use the single-upload page; bulk is whole video files.
   const name = file.name.toLowerCase()
   if (name.endsWith('.m3u8') || name.endsWith('.m4s')) return false
   return isVideoFile(file)
@@ -25,21 +25,23 @@ async function waitMeta(video: HTMLVideoElement) {
     }
     video.addEventListener('loadedmetadata', ok, { once: true })
     video.addEventListener('loadeddata', ok, { once: true })
-    video.addEventListener('error', () => {
-      window.clearTimeout(timer)
-      reject(new Error('Could not read video'))
-    }, { once: true })
+    video.addEventListener(
+      'error',
+      () => {
+        window.clearTimeout(timer)
+        reject(new Error('Could not read video'))
+      },
+      { once: true },
+    )
   })
 }
 
-/** Poster from exact mid-point (50%). Extra rotate frames optional. */
 async function scenesFromFile(file: File, fullScenes: boolean): Promise<{ duration: number; scenes: File[] }> {
   const url = URL.createObjectURL(file)
   const video = document.createElement('video')
   video.muted = true
   video.playsInline = true
   video.preload = 'auto'
-  // blob: URLs must not set crossOrigin or canvas capture can fail
   video.src = url
   video.style.cssText = 'position:fixed;left:-9999px;width:16px;height:9px;opacity:0;pointer-events:none'
   document.body.appendChild(video)
@@ -69,12 +71,7 @@ async function scenesFromFile(file: File, fullScenes: boolean): Promise<{ durati
   }
 }
 
-async function uploadAllThumbs(
-  scenes: File[],
-  workerUrl: string,
-  uploadSecret: string,
-  onEach?: (done: number, total: number) => void,
-) {
+async function uploadAllThumbs(scenes: File[], workerUrl: string, uploadSecret: string) {
   if (!scenes.length) return [] as string[]
   const ups = await Promise.all(
     scenes.map((file) =>
@@ -86,7 +83,6 @@ async function uploadAllThumbs(
       }),
     ),
   )
-  onEach?.(scenes.length, scenes.length)
   return ups.map((u) => u.url)
 }
 
@@ -100,24 +96,25 @@ export async function publishVideoFile(opts: {
 }): Promise<Video> {
   const text = opts.caption.trim()
   if (!text) throw new Error('Add a caption')
-  opts.onProgress?.(3)
+  opts.onProgress?.(2)
 
-  // Upload the big video while grabbing the mid-point poster — big speed win.
-  let videoPct = 0
-  const videoTask = uploadMedia({
-    file: opts.file,
-    folder: 'videos',
-    workerUrl: opts.workerUrl,
-    uploadSecret: opts.uploadSecret,
-    onProgress: (pct) => {
-      videoPct = pct
-      opts.onProgress?.(5 + Math.round(pct * 0.75))
-    },
+  // Poster from source while FFmpeg builds HLS — parallel for speed.
+  const scenesTask = scenesFromFile(opts.file, false).catch(() => ({ duration: 0, scenes: [] as File[] }))
+
+  const hls = await transcodeToHls(opts.file, (pct, _label) => {
+    opts.onProgress?.(Math.min(70, Math.round(pct * 0.7)))
   })
-  const scenesTask = scenesFromFile(opts.file, false)
+  opts.onProgress?.(72)
 
-  const [videoUp, { duration, scenes }] = await Promise.all([videoTask, scenesTask])
-  opts.onProgress?.(Math.max(82, 5 + Math.round(videoPct * 0.75)))
+  const [{ duration: metaDur, scenes }, up] = await Promise.all([
+    scenesTask,
+    uploadHlsPack({
+      files: hls.files,
+      workerUrl: opts.workerUrl,
+      uploadSecret: opts.uploadSecret,
+      onProgress: (pct) => opts.onProgress?.(72 + Math.round(pct * 0.22)),
+    }),
+  ])
 
   const previewUrls = await uploadAllThumbs(scenes, opts.workerUrl, opts.uploadSecret)
   opts.onProgress?.(96)
@@ -130,10 +127,10 @@ export async function publishVideoFile(opts: {
     titleBn: text,
     captionEn: text,
     captionBn: text,
-    videoUrl: videoUp.url,
+    videoUrl: up.url,
     thumbnailUrl: previewUrls[0] || '',
     previewUrls,
-    duration,
+    duration: up.duration || hls.duration || metaDur || 0,
     views: 0,
     likes: 0,
     categoryId: '',

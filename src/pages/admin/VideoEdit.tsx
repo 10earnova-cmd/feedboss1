@@ -5,6 +5,7 @@ import { useSite } from '../../context/SiteContext'
 import { db, newId } from '../../lib/db'
 import { isHlsUrl, mediaCrossOrigin, parseHlsDuration, pickHlsPlaylist, VIDEO_ACCEPT, isVideoFile } from '../../lib/media'
 import { captureScenes, readVideoMeta, uploadHlsPack, uploadMedia } from '../../lib/storage'
+import { transcodeToHls } from '../../lib/transcode'
 import { slugify, uniqueSlug } from '../../lib/slug'
 import type { Video } from '../../types'
 
@@ -181,6 +182,7 @@ export function VideoEdit() {
       const secret = priv.uploadSecret || settings.uploadSecret || import.meta.env.VITE_R2_UPLOAD_SECRET || ''
 
       if (hlsFiles.length) {
+        setMsg('Uploading HLS pack…')
         const up = await uploadHlsPack({
           files: hlsFiles,
           workerUrl,
@@ -190,14 +192,21 @@ export function VideoEdit() {
         videoUrl = up.url
         if (up.duration) duration = up.duration
       } else if (videoFile) {
-        const up = await uploadMedia({
-          file: videoFile,
-          folder: 'videos',
+        setMsg('Converting to HLS (remux first, quality kept)…')
+        const hls = await transcodeToHls(videoFile, (pct, label) => {
+          setProgress(Math.min(70, pct))
+          setMsg(label)
+        })
+        setMsg('Uploading HLS to Cloudflare R2…')
+        const up = await uploadHlsPack({
+          files: hls.files,
           workerUrl,
           uploadSecret: secret,
-          onProgress: setProgress,
+          onProgress: (pct) => setProgress(70 + Math.round(pct * 0.28)),
         })
         videoUrl = up.url
+        if (up.duration) duration = up.duration
+        else if (hls.duration) duration = hls.duration
       }
 
       if (sceneFiles.length) {
@@ -249,7 +258,9 @@ export function VideoEdit() {
     <form onSubmit={(e) => void onSave(e)} className="mx-auto max-w-xl">
       <Seo title={isNew ? 'Upload' : 'Edit video'} />
       <h1 className="text-2xl font-bold">{isNew ? 'Upload' : 'Edit video'}</h1>
-      <p className="mt-1 text-sm text-muted">Any video format (mp4, mov, mkv, avi, webm, …). Poster comes from the middle when the browser can decode it.</p>
+      <p className="mt-1 text-sm text-muted">
+        Any format is remuxed/encoded to HLS (m3u8) first — remux keeps quality; then files go to Cloudflare R2. Player preloads ahead segments.
+      </p>
       {isNew ? (
         <p className="mt-2 text-sm">
           <Link className="text-accent" to="/admin/bulk">
@@ -287,7 +298,7 @@ export function VideoEdit() {
       {form.thumbnailUrl ? <img src={form.thumbnailUrl} alt="" className="mt-3 h-28 w-48 rounded-lg object-cover" /> : null}
 
       <button className="btn btn-primary mt-6 w-full" disabled={busy} type="submit">
-        {busy ? `Uploading ${progress || 0}%` : 'Publish'}
+        {busy ? `Processing ${progress || 0}%` : 'Publish'}
       </button>
     </form>
   )
