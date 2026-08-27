@@ -66,7 +66,7 @@ export function AdminVideos() {
                 <tr key={v.id} className="border-t border-line">
                   <td className="p-3">
                     <div className="h-12 w-20 overflow-hidden rounded">
-                      <VideoThumb src={v.videoUrl} poster={usablePoster(v.thumbnailUrl)} preview={false} />
+                      <VideoThumb src={v.videoUrl} poster={usablePoster(v.thumbnailUrl)} scenes={v.previewUrls} preview={false} />
                     </div>
                   </td>
                   <td className="p-3">

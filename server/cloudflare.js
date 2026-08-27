@@ -3,6 +3,7 @@
  * Static Vite files are served from dist via wrangler assets (SPA).
  */
 import { preflight, withCors } from './cors.js'
+import { cacheControlFor, contentTypeFor } from './media.js'
 
 const folders = new Set(['videos', 'thumbs', 'images'])
 
@@ -55,14 +56,18 @@ async function handleUpload(request, env) {
   const file = form.get('file')
   if (!file || typeof file === 'string') return json({ error: 'file missing' }, 400)
 
-  const folderRaw = String(form.get('folder') || 'videos')
-  const folder = folders.has(folderRaw) ? folderRaw : 'videos'
-  const given = String(form.get('filename') || file.name || 'file.bin')
-  const base = given.split('/').pop() || 'file.bin'
-  const key = safeKey(`${folder}/${Date.now()}-${base}`) || `${folder}/${Date.now()}.bin`
+  const requested = String(form.get('key') || form.get('filename') || '')
+  let key = requested.includes('/') ? safeKey(requested) : ''
+  if (!key) {
+    const folderRaw = String(form.get('folder') || 'videos')
+    const folder = folders.has(folderRaw) ? folderRaw : 'videos'
+    const base = (requested || file.name || 'file.bin').split('/').pop() || 'file.bin'
+    key = safeKey(`${folder}/${Date.now()}-${base}`) || `${folder}/${Date.now()}.bin`
+  }
 
+  const contentType = contentTypeFor(key, file.type)
   await env.R2.put(key, file.stream(), {
-    httpMetadata: { contentType: file.type || 'application/octet-stream' },
+    httpMetadata: { contentType },
   })
   return json({ url: `/api/file/${key}`, key })
 }
@@ -88,9 +93,10 @@ async function handleFile(request, env, pathname) {
 
   const headers = new Headers()
   obj.writeHttpMetadata(headers)
+  headers.set('Content-Type', contentTypeFor(key, headers.get('Content-Type')))
   headers.set('etag', obj.httpEtag)
   headers.set('Accept-Ranges', 'bytes')
-  headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+  headers.set('Cache-Control', cacheControlFor(key))
 
   if (parsed && obj.size != null) {
     const start = parsed.start ?? Math.max(0, obj.size - (parsed.suffix || 0))

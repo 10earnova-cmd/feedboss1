@@ -2,6 +2,7 @@ import { Heart, Share2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { AdSlot } from '../components/AdSlot'
+import { PosterLink } from '../components/PosterLink'
 import { Seo } from '../components/Seo'
 import { VideoGrid } from '../components/VideoGrid'
 import { VideoPlayer } from '../components/VideoPlayer'
@@ -131,10 +132,10 @@ export function Watch() {
             {(related.length ? related : published.filter((v) => v.id !== video.id))
               .slice(0, 8)
               .map((v) => (
-                <Link key={v.id} to={`/watch/${v.slug}`} className="watch-side-item">
-                  <VideoThumb src={v.videoUrl} poster={usablePoster(v.thumbnailUrl)} duration={v.duration} />
+                <PosterLink key={v.id} video={v} className="watch-side-item">
+                  <VideoThumb src={v.videoUrl} poster={usablePoster(v.thumbnailUrl)} scenes={v.previewUrls} duration={v.duration} />
                   <span className="line-clamp-3 text-sm">{pick(v, lang, 'title')}</span>
-                </Link>
+                </PosterLink>
               ))}
           </div>
         </div>

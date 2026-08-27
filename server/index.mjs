@@ -2,6 +2,7 @@ import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { corsHeaderRecord, preflight } from './cors.js'
+import { cacheControlFor, contentTypeFor } from './media.js'
 
 const bucket = process.env.R2_BUCKET || 'feedboss'
 const endpoint = process.env.R2_ENDPOINT
@@ -75,11 +76,15 @@ app.post('/api/upload', async (c) => {
     return c.json({ error: 'file missing' }, 400)
   }
 
-  const folderRaw = typeof form.folder === 'string' ? form.folder : 'videos'
-  const folder = folders.has(folderRaw) ? folderRaw : 'videos'
-  const given = typeof form.filename === 'string' ? form.filename : file.name || 'file.bin'
-  const base = given.split('/').pop() || 'file.bin'
-  const key = safeKey(`${folder}/${Date.now()}-${base}`) || `${folder}/${Date.now()}.bin`
+  const requested =
+    (typeof form.key === 'string' && form.key) || (typeof form.filename === 'string' && form.filename) || ''
+  let key = requested.includes('/') ? safeKey(requested) : ''
+  if (!key) {
+    const folderRaw = typeof form.folder === 'string' ? form.folder : 'videos'
+    const folder = folders.has(folderRaw) ? folderRaw : 'videos'
+    const base = (requested || file.name || 'file.bin').split('/').pop() || 'file.bin'
+    key = safeKey(`${folder}/${Date.now()}-${base}`) || `${folder}/${Date.now()}.bin`
+  }
 
   const buf = Buffer.from(await file.arrayBuffer())
   await s3.send(
@@ -87,7 +92,7 @@ app.post('/api/upload', async (c) => {
       Bucket: bucket,
       Key: key,
       Body: buf,
-      ContentType: file.type || 'application/octet-stream',
+      ContentType: contentTypeFor(key, file.type),
     }),
   )
 
@@ -108,9 +113,9 @@ app.get('/api/file/*', async (c) => {
       }),
     )
     const headers = new Headers()
-    headers.set('Content-Type', obj.ContentType || 'application/octet-stream')
+    headers.set('Content-Type', contentTypeFor(key, obj.ContentType))
     headers.set('Accept-Ranges', 'bytes')
-    headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+    headers.set('Cache-Control', cacheControlFor(key))
     if (obj.ContentLength != null) headers.set('Content-Length', String(obj.ContentLength))
     if (obj.ContentRange) headers.set('Content-Range', obj.ContentRange)
     const status = obj.ContentRange ? 206 : 200

@@ -1,3 +1,4 @@
+import { parseHlsDuration, pickHlsPlaylist, rewriteHlsPlaylist, hlsRelativePath, sanitizeHlsPath, SCENE_PCTS, sceneTime } from './media'
 import { auth } from './firebase'
 
 export type UploadProgress = (pct: number) => void
@@ -6,6 +7,8 @@ function extOf(file: File) {
   const fromName = file.name.split('.').pop()?.toLowerCase()
   if (fromName && /^[a-z0-9]+$/.test(fromName) && fromName.length <= 5) return fromName
   if (file.type.includes('mp4')) return 'mp4'
+  if (file.type.includes('mpegurl') || file.name.toLowerCase().endsWith('.m3u8')) return 'm3u8'
+  if (file.type.includes('mp2t') || file.name.toLowerCase().endsWith('.ts')) return 'ts'
   if (file.type.includes('webm')) return 'webm'
   if (file.type.includes('png')) return 'png'
   if (file.type.includes('webp')) return 'webp'
@@ -18,11 +21,29 @@ export function mediaApiUrl(workerUrl?: string) {
   return raw.replace(/\/$/, '') || '/api'
 }
 
+function publicMediaUrl(workerUrl: string, key: string, returned?: string) {
+  if (returned && /^https?:\/\//i.test(returned)) return returned
+  const pub = String(import.meta.env.VITE_R2_PUBLIC_BASE || '').replace(/\/$/, '')
+  if (pub) return `${pub}/${key}`
+  if (returned?.startsWith('/')) {
+    if (/^https?:\/\//i.test(workerUrl)) {
+      try {
+        return `${new URL(workerUrl).origin}${returned}`
+      } catch {
+        /* use relative */
+      }
+    }
+    return returned
+  }
+  return `${workerUrl}/file/${key}`
+}
+
 export async function uploadMedia(opts: {
   file: File
   folder: 'videos' | 'thumbs' | 'images'
   workerUrl: string
   uploadSecret: string
+  key?: string
   onProgress?: UploadProgress
 }): Promise<{ url: string; key: string }> {
   const workerUrl = mediaApiUrl(opts.workerUrl)
@@ -33,7 +54,7 @@ export async function uploadMedia(opts: {
     throw new Error('Upload secret or Firebase login is required.')
   }
 
-  const keyHint = `${opts.folder}/${crypto.randomUUID()}.${extOf(opts.file)}`
+  const keyHint = opts.key || `${opts.folder}/${crypto.randomUUID()}.${extOf(opts.file)}`
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -47,8 +68,9 @@ export async function uploadMedia(opts: {
     }
     xhr.onload = () => {
       const body = xhr.response as { url?: string; key?: string; error?: string } | null
-      if (xhr.status >= 200 && xhr.status < 300 && body?.url) {
-        resolve({ url: body.url, key: body.key || keyHint })
+      const key = body?.key || keyHint
+      if (xhr.status >= 200 && xhr.status < 300 && (body?.url || key)) {
+        resolve({ url: publicMediaUrl(workerUrl, key, body?.url), key })
         return
       }
       reject(new Error(body?.error || `Upload failed (${xhr.status})`))
@@ -58,15 +80,83 @@ export async function uploadMedia(opts: {
     form.append('file', opts.file)
     form.append('folder', opts.folder)
     form.append('filename', keyHint)
+    form.append('key', keyHint)
     xhr.send(form)
   })
 }
 
-export function captureThumb(videoEl: HTMLVideoElement): Promise<Blob> {
+export async function uploadHlsPack(opts: {
+  files: File[]
+  workerUrl: string
+  uploadSecret: string
+  onProgress?: UploadProgress
+}): Promise<{ url: string; key: string; duration: number }> {
+  const playlist = pickHlsPlaylist(opts.files)
+  if (!playlist) {
+    throw new Error('HLS upload needs an .m3u8 playlist (plus .ts / .m4s segments)')
+  }
+
+  const packId = crypto.randomUUID()
+  const nameMap: Record<string, string> = {}
+  const prepared: { file: File; key: string; isPlaylist: boolean }[] = []
+
+  for (const file of opts.files) {
+    const original = hlsRelativePath(file).replace(/^\.\//, '')
+    const rel = sanitizeHlsPath(original)
+    if (!rel) continue
+    nameMap[original] = rel
+    nameMap[file.name] = rel.split('/').pop() || rel
+    prepared.push({
+      file,
+      key: `videos/${packId}/${rel}`,
+      isPlaylist: file.name.toLowerCase().endsWith('.m3u8'),
+    })
+  }
+
+  if (!prepared.length) throw new Error('No valid HLS files to upload')
+
+  let done = 0
+  let playlistUrl = ''
+  let playlistKey = ''
+  let duration = 0
+  const total = prepared.length
+
+  for (const item of prepared) {
+    let file = item.file
+    if (item.isPlaylist) {
+      const text = await item.file.text()
+      duration = Math.max(duration, parseHlsDuration(text))
+      const rewritten = rewriteHlsPlaylist(text, nameMap)
+      file = new File([rewritten], item.file.name, { type: 'application/vnd.apple.mpegurl' })
+    }
+    const up = await uploadMedia({
+      file,
+      folder: 'videos',
+      workerUrl: opts.workerUrl,
+      uploadSecret: opts.uploadSecret,
+      key: item.key,
+      onProgress: (pct) => opts.onProgress?.(Math.round(((done + pct / 100) / total) * 100)),
+    })
+    done += 1
+    opts.onProgress?.(Math.round((done / total) * 100))
+    if (item.file === playlist) {
+      playlistUrl = up.url
+      playlistKey = up.key
+    }
+  }
+
+  if (!playlistUrl) throw new Error('Playlist upload failed')
+  return { url: playlistUrl, key: playlistKey, duration }
+}
+
+export function captureThumb(videoEl: HTMLVideoElement, maxW = 720): Promise<Blob> {
   return new Promise((resolve, reject) => {
+    const vw = videoEl.videoWidth || 1280
+    const vh = videoEl.videoHeight || 720
+    const scale = Math.min(1, maxW / vw)
     const canvas = document.createElement('canvas')
-    canvas.width = videoEl.videoWidth || 1280
-    canvas.height = videoEl.videoHeight || 720
+    canvas.width = Math.max(1, Math.round(vw * scale))
+    canvas.height = Math.max(1, Math.round(vh * scale))
     const ctx = canvas.getContext('2d')
     if (!ctx) {
       reject(new Error('Canvas not supported'))
@@ -79,9 +169,44 @@ export function captureThumb(videoEl: HTMLVideoElement): Promise<Blob> {
         else resolve(blob)
       },
       'image/jpeg',
-      0.82,
+      0.78,
     )
   })
+}
+
+export function seekVideo(video: HTMLVideoElement, time: number) {
+  return new Promise<void>((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      video.removeEventListener('seeked', finish)
+      resolve()
+    }
+    if (Math.abs((video.currentTime || 0) - time) < 0.08 && video.readyState >= 2) {
+      resolve()
+      return
+    }
+    video.addEventListener('seeked', finish)
+    try {
+      video.currentTime = time
+    } catch {
+      finish()
+      return
+    }
+    window.setTimeout(finish, 2000)
+  })
+}
+
+export async function captureScenes(video: HTMLVideoElement, percents = SCENE_PCTS): Promise<Blob[]> {
+  const dur = video.duration
+  const pts = Number.isFinite(dur) && dur > 0 ? percents : [0.1]
+  const blobs: Blob[] = []
+  for (const p of pts) {
+    await seekVideo(video, sceneTime(dur, p))
+    blobs.push(await captureThumb(video))
+  }
+  return blobs
 }
 
 export function readVideoMeta(file: File): Promise<{ duration: number; objectUrl: string }> {

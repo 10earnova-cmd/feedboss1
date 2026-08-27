@@ -154,6 +154,7 @@ export function defaultVideos(): Video[] {
     captionBn: `${t.bn}। ডেমো প্লেসহোল্ডার ভিডিও। Cloudflare R2 কানেক্ট করে /admin থেকে আসল ফাইল আপলোড করুন।`,
     videoUrl: samples[i % samples.length],
     thumbnailUrl: '',
+    previewUrls: [],
     duration: 90 + i * 37,
     views: 1200 + i * 1840,
     likes: 40 + i * 13,
@@ -170,6 +171,7 @@ export function defaultVideos(): Video[] {
 
 export function defaultAds(): Ad[] {
   return [
+    { id: 'ad_poster', slot: 'poster_click', name: 'Poster first / later clicks', type: 'direct_link', scriptCode: '', html: '', url: '', url2: '', labelEn: '', labelBn: '', enabled: false },
     { id: 'ad_pop', slot: 'popunder', name: 'Monetag Popunder', type: 'script', scriptCode: '', html: '', url: '', labelEn: '', labelBn: '', enabled: false },
     { id: 'ad_header', slot: 'header', name: 'Header banner', type: 'html', scriptCode: '', html: '', url: '', labelEn: 'Sponsored', labelBn: 'স্পনসর্ড', enabled: false },
     { id: 'ad_player', slot: 'below_player', name: 'Below player', type: 'html', scriptCode: '', html: '', url: '', labelEn: '', labelBn: '', enabled: false },

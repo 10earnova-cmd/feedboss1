@@ -130,6 +130,11 @@ a {
   display: block;
 }
 
+.thumb-scene {
+  position: absolute;
+  inset: 0;
+}
+
 .thumb video {
   position: absolute;
   inset: 0;

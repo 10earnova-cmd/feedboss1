@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Seo } from '../../components/Seo'
+import { VideoPlayer } from '../../components/VideoPlayer'
 import { useSite } from '../../context/SiteContext'
 import { db, newId } from '../../lib/db'
-import { captureThumb, readVideoMeta, uploadMedia } from '../../lib/storage'
-import { mediaCrossOrigin } from '../../lib/media'
+import { isHlsUrl, mediaCrossOrigin, parseHlsDuration, pickHlsPlaylist } from '../../lib/media'
+import { captureScenes, captureThumb, readVideoMeta, uploadHlsPack, uploadMedia } from '../../lib/storage'
 import { slugify, uniqueSlug } from '../../lib/slug'
 import type { Video, VideoStatus } from '../../types'
 
@@ -17,6 +18,7 @@ const empty = (categoryId: string): Video => ({
   captionBn: '',
   videoUrl: '',
   thumbnailUrl: '',
+  previewUrls: [],
   duration: 0,
   views: 0,
   likes: 0,
@@ -41,7 +43,9 @@ export function VideoEdit() {
   const [progress, setProgress] = useState(0)
   const [msg, setMsg] = useState('')
   const [videoFile, setVideoFile] = useState<File | null>(null)
+  const [hlsFiles, setHlsFiles] = useState<File[]>([])
   const [thumbFile, setThumbFile] = useState<File | null>(null)
+  const [sceneFiles, setSceneFiles] = useState<File[]>([])
   const [previewSrc, setPreviewSrc] = useState('')
   const previewRef = useRef<HTMLVideoElement>(null)
   const localUrl = useRef('')
@@ -72,45 +76,69 @@ export function VideoEdit() {
   useEffect(() => {
     const el = previewRef.current
     if (!el || !previewSrc) return
-    let done = false
-    const grab = async () => {
-      if (done) return
-      done = true
+    let cancelled = false
+    let started = false
+    const run = async () => {
       try {
-        const blob = await captureThumb(el)
-        setThumbFile(new File([blob], 'thumb.jpg', { type: 'image/jpeg' }))
-        const url = URL.createObjectURL(blob)
-        setForm((f) => (f ? { ...f, thumbnailUrl: url } : f))
+        const blobs = await captureScenes(el)
+        if (cancelled || !blobs.length) return
+        const files = blobs.map((b, i) => new File([b], `scene-${i}.jpg`, { type: 'image/jpeg' }))
+        const urls = files.map((f) => URL.createObjectURL(f))
+        setThumbFile(files[0])
+        setSceneFiles(files)
+        setForm((f) => (f ? { ...f, thumbnailUrl: urls[0], previewUrls: urls } : f))
       } catch {
         /* canvas may fail on cross-origin URLs */
       }
     }
-    const onSeeked = () => {
-      void grab()
+    const onReady = () => {
+      if (started) return
+      started = true
+      void run()
     }
-    const onLoaded = () => {
-      try {
-        el.currentTime = Math.min(2, (el.duration || 2) * 0.1)
-      } catch {
-        void grab()
-      }
-    }
-    el.addEventListener('loadeddata', onLoaded)
-    el.addEventListener('seeked', onSeeked)
-    if (el.readyState >= 2) onLoaded()
+    el.addEventListener('loadeddata', onReady)
+    if (el.readyState >= 2) onReady()
     return () => {
-      el.removeEventListener('loadeddata', onLoaded)
-      el.removeEventListener('seeked', onSeeked)
+      cancelled = true
+      el.removeEventListener('loadeddata', onReady)
     }
   }, [previewSrc])
 
   if (!form) return <p className="text-muted">Video not found.</p>
 
   const set = <K extends keyof Video>(key: K, value: Video[K]) => setForm({ ...form, [key]: value })
+  const hlsPlaylist = pickHlsPlaylist(hlsFiles)
+  const hlsMode = hlsFiles.length > 0 || isHlsUrl(form.videoUrl)
 
-  const onPickVideo = async (file: File) => {
-    setVideoFile(file)
+  const onPickFiles = async (files: File[]) => {
     setMsg('')
+    const pack = files.filter((f) => /\.(m3u8|ts|m4s|vtt|key)$/i.test(f.name))
+    const playlist = pickHlsPlaylist(pack)
+    if (playlist) {
+      setHlsFiles(pack)
+      setVideoFile(null)
+      setSceneFiles([])
+      if (localUrl.current) URL.revokeObjectURL(localUrl.current)
+      localUrl.current = ''
+      setPreviewSrc('')
+      const duration = parseHlsDuration(await playlist.text())
+      setForm((f) => (f ? { ...f, duration: duration || f.duration } : f))
+      const segs = pack.filter((f) => /\.(ts|m4s)$/i.test(f.name)).length
+      setMsg(
+        segs
+          ? `HLS pack ready: ${playlist.name} + ${segs} segments (${pack.length} files)`
+          : `Playlist ${playlist.name} selected. Also select every .ts / .m4s file, or paste a full HLS URL.`,
+      )
+      return
+    }
+    if (files.length > 1) {
+      setMsg('No .m3u8 playlist found. Select the playlist with every .ts file, or a single MP4.')
+      return
+    }
+    const file = files.find((f) => /\.(mp4|webm)$/i.test(f.name)) || files[0]
+    if (!file) return
+    setHlsFiles([])
+    setVideoFile(file)
     if (localUrl.current) URL.revokeObjectURL(localUrl.current)
     try {
       const meta = await readVideoMeta(file)
@@ -131,6 +159,23 @@ export function VideoEdit() {
     set('thumbnailUrl', url)
   }
 
+  const grabScenes = async () => {
+    const el = previewRef.current
+    if (!el) return
+    setMsg('Capturing scene photos…')
+    try {
+      const blobs = await captureScenes(el)
+      const files = blobs.map((b, i) => new File([b], `scene-${i}.jpg`, { type: 'image/jpeg' }))
+      const urls = files.map((f) => URL.createObjectURL(f))
+      setThumbFile(files[0] || null)
+      setSceneFiles(files)
+      setForm((f) => (f ? { ...f, thumbnailUrl: urls[0] || f.thumbnailUrl, previewUrls: urls } : f))
+      setMsg(`Captured ${files.length} scene photos (poster = 10%)`)
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : 'Could not capture scenes')
+    }
+  }
+
   const onSave = async (e: FormEvent) => {
     e.preventDefault()
     if (!form.titleBn && !form.titleEn) {
@@ -142,11 +187,22 @@ export function VideoEdit() {
     try {
       let videoUrl = form.videoUrl
       let thumbnailUrl = form.thumbnailUrl
+      let previewUrls = (form.previewUrls || []).filter((u) => u && !u.startsWith('blob:'))
+      let duration = form.duration
       const workerUrl = settings.workerUrl || import.meta.env.VITE_R2_WORKER_URL || '/api'
       const priv = await db.getPrivateSettings()
       const secret = priv.uploadSecret || settings.uploadSecret || import.meta.env.VITE_R2_UPLOAD_SECRET || ''
 
-      if (videoFile) {
+      if (hlsFiles.length) {
+        const up = await uploadHlsPack({
+          files: hlsFiles,
+          workerUrl,
+          uploadSecret: secret,
+          onProgress: setProgress,
+        })
+        videoUrl = up.url
+        if (up.duration) duration = up.duration
+      } else if (videoFile) {
         const up = await uploadMedia({
           file: videoFile,
           folder: 'videos',
@@ -157,7 +213,21 @@ export function VideoEdit() {
         videoUrl = up.url
       }
 
-      if (thumbFile) {
+      if (sceneFiles.length) {
+        previewUrls = []
+        for (const file of sceneFiles) {
+          const up = await uploadMedia({
+            file,
+            folder: 'thumbs',
+            workerUrl,
+            uploadSecret: secret,
+          })
+          previewUrls.push(up.url)
+        }
+        if (previewUrls[0] && (!thumbFile || thumbFile === sceneFiles[0])) thumbnailUrl = previewUrls[0]
+      }
+
+      if (thumbFile && thumbFile !== sceneFiles[0]) {
         const up = await uploadMedia({
           file: thumbFile,
           folder: 'thumbs',
@@ -172,6 +242,8 @@ export function VideoEdit() {
         slug: form.slug || slugPreview,
         videoUrl,
         thumbnailUrl,
+        previewUrls,
+        duration,
         updatedAt: Date.now(),
         createdAt: isNew ? Date.now() : form.createdAt,
       }
@@ -199,31 +271,82 @@ export function VideoEdit() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div className="space-y-3">
-          <label className="text-sm">Video file (Cloudflare R2)</label>
+          <label className="text-sm">HLS pack or video file (Cloudflare R2)</label>
           <input
             className="input"
             type="file"
-            accept="video/mp4,video/webm,video/*"
+            multiple
+            accept=".m3u8,.ts,.m4s,.mp4,.webm,video/mp4,video/webm,application/vnd.apple.mpegurl,application/x-mpegURL"
             onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) void onPickVideo(f)
+              const files = e.target.files
+              if (files?.length) void onPickFiles([...files])
             }}
           />
-          <label className="text-sm">Or video URL</label>
-          <input className="input" value={form.videoUrl} onChange={(e) => set('videoUrl', e.target.value)} placeholder="https://cdn.../video.mp4" />
-          <video
-            ref={previewRef}
-            className="mt-2 aspect-video w-full rounded-xl bg-black"
-            controls
-            crossOrigin={previewSrc.startsWith('blob:') ? undefined : mediaCrossOrigin(form.videoUrl)}
-            src={previewSrc || form.videoUrl}
+          <label className="text-sm">Or HLS folder (playlist + segments)</label>
+          <input
+            className="input"
+            type="file"
+            multiple
+            // Folder picker keeps relative paths so 720p/index.m3u8 still works.
+            {...({ webkitdirectory: '' } as Record<string, string>)}
+            onChange={(e) => {
+              const files = e.target.files
+              if (files?.length) void onPickFiles([...files])
+            }}
           />
+          <p className="text-xs text-muted">
+            Best: select <code>index.m3u8</code> together with every <code>.ts</code> file, or pick the whole HLS folder.
+            MP4 still works. Worker cannot convert MP4 to HLS — upload a ready m3u8 pack.
+          </p>
+          {hlsPlaylist ? (
+            <p className="text-xs text-muted">
+              Playlist <strong>{hlsPlaylist.name}</strong> · {hlsFiles.length} files will upload as one stream pack.
+            </p>
+          ) : null}
+          <label className="text-sm">Or stream URL (.m3u8 or .mp4)</label>
+          <input
+            className="input"
+            value={form.videoUrl}
+            onChange={(e) => set('videoUrl', e.target.value)}
+            placeholder="https://cdn.../index.m3u8"
+          />
+          {hlsMode && !previewSrc ? (
+            form.videoUrl ? (
+              <VideoPlayer src={form.videoUrl} poster={form.thumbnailUrl.startsWith('blob:') ? '' : form.thumbnailUrl} title={form.titleEn || form.titleBn || 'Preview'} />
+            ) : (
+              <div className="mt-2 flex aspect-video items-center justify-center rounded-xl bg-black text-sm text-muted">
+                HLS preview after save, or paste an .m3u8 URL
+              </div>
+            )
+          ) : (
+            <video
+              ref={previewRef}
+              className="mt-2 aspect-video w-full rounded-xl bg-black"
+              controls
+              crossOrigin={previewSrc.startsWith('blob:') ? undefined : mediaCrossOrigin(form.videoUrl)}
+              src={previewSrc || (isHlsUrl(form.videoUrl) ? '' : form.videoUrl)}
+            />
+          )}
           <div className="flex flex-wrap items-center gap-2">
-            <button className="btn btn-ghost" type="button" onClick={() => void grabThumb()}>
+            <button className="btn btn-ghost" type="button" onClick={() => void grabThumb()} disabled={hlsMode && !previewSrc}>
               Capture thumbnail from video
             </button>
-            <p className="text-xs text-muted">Auto-captured from ~2s when you pick a file. Seek then recapture if needed.</p>
+            <button className="btn btn-ghost" type="button" onClick={() => void grabScenes()} disabled={hlsMode && !previewSrc}>
+              Capture changing scenes
+            </button>
+            <p className="text-xs text-muted">
+              {hlsMode
+                ? 'HLS needs a poster image — upload a thumbnail below.'
+                : 'Poster is taken at 10% of the video. Extra photos from later scenes keep rotating on the grid.'}
+            </p>
           </div>
+          {(form.previewUrls || []).length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {(form.previewUrls || []).map((url) => (
+                <img key={url} src={url} alt="" className="h-16 w-24 rounded object-cover" />
+              ))}
+            </div>
+          ) : null}
           <label className="text-sm">Thumbnail file</label>
           <input
             className="input"

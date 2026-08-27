@@ -11,6 +11,7 @@ export type Video = {
   captionBn: string
   videoUrl: string
   thumbnailUrl: string
+  previewUrls?: string[]
   duration: number
   views: number
   likes: number
@@ -52,6 +53,7 @@ export type Performer = {
 }
 
 export type AdSlot =
+  | 'poster_click'
   | 'popunder'
   | 'header'
   | 'below_player'
@@ -72,6 +74,7 @@ export type Ad = {
   scriptCode: string
   html: string
   url: string
+  url2?: string
   labelEn: string
   labelBn: string
   enabled: boolean
