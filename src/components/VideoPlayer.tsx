@@ -1,3 +1,5 @@
+import { mediaCrossOrigin } from '../lib/media'
+
 export function VideoPlayer({ src, poster, title }: { src: string; poster: string; title: string }) {
   return (
     <div className="player-wrap">
@@ -5,6 +7,7 @@ export function VideoPlayer({ src, poster, title }: { src: string; poster: strin
         className="aspect-video w-full bg-black"
         controls
         playsInline
+        crossOrigin={mediaCrossOrigin(src)}
         poster={poster || undefined}
         preload="metadata"
         title={title}

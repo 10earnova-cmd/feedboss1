@@ -59,7 +59,7 @@ export function Watch() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-      <Seo title={`${title} | DeshiX`} description={caption} />
+      <Seo title={`${title} | FeedBoss`} description={caption} />
       <div>
         <VideoPlayer src={video.videoUrl} poster={usablePoster(video.thumbnailUrl)} title={title} />
         <div className="mt-3 grid gap-2 sm:grid-cols-2">

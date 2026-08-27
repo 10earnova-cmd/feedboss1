@@ -20,6 +20,7 @@
     }
   ],
   "vars": {
-    "FIREBASE_WEB_API_KEY": "AIzaSyDWkkSuH8tuan2uyTAregqeRgjxZFEQ_RY"
+    "FIREBASE_WEB_API_KEY": "AIzaSyDWkkSuH8tuan2uyTAregqeRgjxZFEQ_RY",
+    "ALLOWED_ORIGINS": "https://getvideo.fun,https://www.getvideo.fun"
   }
 }

@@ -7,7 +7,7 @@ import { tr } from '../i18n'
 
 export function Home() {
   const { lang } = useLang()
-  const { settings, published } = useSite()
+  const { settings, published, loading } = useSite()
   const trending = published.filter((v) => v.trending).slice(0, 12)
   const rest = published.filter((v) => !trending.some((t) => t.id === v.id)).slice(0, 36)
   const name = lang === 'bn' ? settings.siteNameBn : settings.siteNameEn
@@ -31,7 +31,9 @@ export function Home() {
           <h2>{tr('featured', lang)}</h2>
           <Link to="/latest">{tr('more', lang)}</Link>
         </div>
-        {published.length === 0 ? (
+        {loading && published.length === 0 ? (
+          <p className="text-muted">Loading videos…</p>
+        ) : published.length === 0 ? (
           <p className="text-muted">{tr('noVideos', lang)}</p>
         ) : (
           <VideoGrid videos={rest.length ? rest : published.slice(0, 36)} />

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { videoFrameUrl } from '../lib/media'
+import { videoFrameUrl, mediaCrossOrigin } from '../lib/media'
 import { formatDuration } from '../lib/format'
 
 export function VideoThumb({
@@ -15,29 +15,34 @@ export function VideoThumb({
 }) {
   const box = useRef<HTMLDivElement>(null)
   const vid = useRef<HTMLVideoElement>(null)
-  const [ready, setReady] = useState(false)
+  const [inView, setInView] = useState(false)
+  const [hover, setHover] = useState(false)
 
   useEffect(() => {
     const el = box.current
     if (!el) return
     const io = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) setReady(true)
+        if (entry.isIntersecting) setInView(true)
       },
-      { rootMargin: '160px' },
+      { rootMargin: '80px' },
     )
     io.observe(el)
     return () => io.disconnect()
   }, [])
 
+  const playVideo = hover && preview && inView && src
+
   const onEnter = () => {
     if (!preview) return
+    setHover(true)
     const v = vid.current
     if (!v) return
     void v.play().catch(() => undefined)
   }
 
   const onLeave = () => {
+    setHover(false)
     const v = vid.current
     if (!v) return
     v.pause()
@@ -50,28 +55,19 @@ export function VideoThumb({
 
   return (
     <div ref={box} className="thumb" onMouseEnter={onEnter} onMouseLeave={onLeave}>
-      {ready && src ? (
+      {poster ? <img src={poster} alt="" loading="lazy" /> : <div className="thumb-empty" />}
+      {playVideo ? (
         <video
           ref={vid}
           src={videoFrameUrl(src, 2)}
-          poster={poster || undefined}
+          crossOrigin={mediaCrossOrigin(src)}
           muted
           loop
           playsInline
           preload="metadata"
-          onLoadedMetadata={(e) => {
-            try {
-              e.currentTarget.currentTime = 2
-            } catch {
-              /* ignore */
-            }
-          }}
+          autoPlay
         />
-      ) : poster ? (
-        <img src={poster} alt="" loading="lazy" />
-      ) : (
-        <div className="thumb-empty" />
-      )}
+      ) : null}
       <span className="hd">HD</span>
       {duration != null && duration > 0 ? <span className="badge">{formatDuration(duration)}</span> : null}
     </div>

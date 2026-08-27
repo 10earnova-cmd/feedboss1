@@ -1,6 +1,7 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { Menu, Search, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import { BrandLink } from './Brand'
 import { useLang } from '../context/LangContext'
 import { useSite } from '../context/SiteContext'
 import { pick } from '../lib/format'
@@ -12,7 +13,6 @@ export function Header() {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const navigate = useNavigate()
-  const name = lang === 'bn' ? settings.siteNameBn : settings.siteNameEn
 
   const onSearch = (e: FormEvent) => {
     e.preventDefault()
@@ -33,16 +33,25 @@ export function Header() {
   return (
     <header className="site-header">
       <div className="page header-main">
-        <Link to="/" className="logo">
-          {settings.logoUrl ? (
-            <img src={settings.logoUrl} alt={name} className="h-8 w-auto" />
-          ) : (
-            <span>
-              {name.replace(/x|X|এক্স/i, '')}
-              <span className="logo-x">X</span>
-            </span>
-          )}
-        </Link>
+        <button className="menu-btn" type="button" aria-label="Menu" onClick={() => setOpen((v) => !v)}>
+          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+
+        {settings.logoUrl ? (
+          <Link to="/" className="logo-link">
+            <img src={settings.logoUrl} alt="FeedBoss" className="h-8 w-auto" />
+          </Link>
+        ) : (
+          <BrandLink />
+        )}
+
+        <nav className="header-nav">
+          {nav.map((n) => (
+            <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => (isActive ? 'on' : '')}>
+              {n.label}
+            </NavLink>
+          ))}
+        </nav>
 
         <form onSubmit={onSearch} className="header-search">
           <Search className="search-ico" />
@@ -55,15 +64,17 @@ export function Header() {
         <button className="lang-btn" type="button" onClick={() => setLang(lang === 'bn' ? 'en' : 'bn')}>
           {lang === 'bn' ? 'EN' : 'বাং'}
         </button>
-        <button className="menu-btn" type="button" onClick={() => setOpen((v) => !v)}>
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
       </div>
 
-      <nav className="header-sub">
+      <nav className={`header-sub${categories.length ? '' : ' header-sub-empty'}`}>
         <div className="page header-sub-inner">
           {nav.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => (isActive ? 'on' : '')}>
+            <NavLink
+              key={`sub-${n.to}`}
+              to={n.to}
+              end={n.to === '/'}
+              className={({ isActive }) => `sub-only-mobile ${isActive ? 'on' : ''}`}
+            >
               {n.label}
             </NavLink>
           ))}
@@ -83,6 +94,12 @@ export function Header() {
           {nav.map((n) => (
             <Link key={n.to} to={n.to} onClick={() => setOpen(false)}>
               {n.label}
+            </Link>
+          ))}
+          <p className="drawer-label">{tr('categories', lang)}</p>
+          {categories.map((c) => (
+            <Link key={c.id} to={`/category/${c.slug}`} onClick={() => setOpen(false)}>
+              {pick(c, lang, 'name')}
             </Link>
           ))}
         </div>

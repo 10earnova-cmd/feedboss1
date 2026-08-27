@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { db } from '../lib/db'
+import { defaultSettings } from '../lib/seed'
 import type { Ad, Category, Performer, SiteSettings, Tag, Video } from '../types'
 
 type Ctx = {
@@ -18,8 +19,7 @@ const SiteContext = createContext<Ctx | null>(null)
 
 export function SiteProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [settings, setSettings] = useState<SiteSettings | null>(null)
+  const [settings, setSettings] = useState<SiteSettings>(defaultSettings)
   const [videos, setVideos] = useState<Video[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [tags, setTags] = useState<Tag[]>([])
@@ -42,9 +42,9 @@ export function SiteProvider({ children }: { children: ReactNode }) {
       setTags(t)
       setPerformers(p)
       setAds(a)
-      setError('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Firebase/Firestore load failed')
+      console.warn('Realtime Database load failed', err)
+      setSettings(defaultSettings)
     } finally {
       setLoading(false)
     }
@@ -56,30 +56,10 @@ export function SiteProvider({ children }: { children: ReactNode }) {
 
   const published = useMemo(() => videos.filter((v) => v.status === 'published'), [videos])
 
-  const value = useMemo(() => {
-    if (!settings) return null
-    return { loading, settings, videos, categories, tags, performers, ads, refresh, published }
-  }, [loading, settings, videos, categories, tags, performers, ads, refresh, published])
-
-  if (!value) {
-    return (
-      <div className="grid min-h-svh place-items-center bg-ink px-4 text-white">
-        {error ? (
-          <div className="card max-w-lg p-6">
-            <h1 className="text-xl font-bold">Firebase is not connected</h1>
-            <p className="mt-2 text-sm text-muted">{error}</p>
-            <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-muted">
-              <li>Firebase Console → create a Firestore Database</li>
-              <li>Authentication → enable Email/Password</li>
-              <li>Firestore Rules → paste this project&apos;s firestore.rules and Publish</li>
-            </ol>
-          </div>
-        ) : (
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-        )}
-      </div>
-    )
-  }
+  const value = useMemo(
+    () => ({ loading, settings, videos, categories, tags, performers, ads, refresh, published }),
+    [loading, settings, videos, categories, tags, performers, ads, refresh, published],
+  )
 
   return <SiteContext.Provider value={value}>{children}</SiteContext.Provider>
 }

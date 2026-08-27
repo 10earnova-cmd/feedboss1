@@ -4,6 +4,7 @@ import { Seo } from '../../components/Seo'
 import { useSite } from '../../context/SiteContext'
 import { db, newId } from '../../lib/db'
 import { captureThumb, readVideoMeta, uploadMedia } from '../../lib/storage'
+import { mediaCrossOrigin } from '../../lib/media'
 import { slugify, uniqueSlug } from '../../lib/slug'
 import type { Video, VideoStatus } from '../../types'
 
@@ -210,7 +211,13 @@ export function VideoEdit() {
           />
           <label className="text-sm">Or video URL</label>
           <input className="input" value={form.videoUrl} onChange={(e) => set('videoUrl', e.target.value)} placeholder="https://cdn.../video.mp4" />
-          <video ref={previewRef} className="mt-2 aspect-video w-full rounded-xl bg-black" controls src={previewSrc || form.videoUrl} />
+          <video
+            ref={previewRef}
+            className="mt-2 aspect-video w-full rounded-xl bg-black"
+            controls
+            crossOrigin={previewSrc.startsWith('blob:') ? undefined : mediaCrossOrigin(form.videoUrl)}
+            src={previewSrc || form.videoUrl}
+          />
           <div className="flex flex-wrap items-center gap-2">
             <button className="btn btn-ghost" type="button" onClick={() => void grabThumb()}>
               Capture thumbnail from video

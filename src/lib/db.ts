@@ -1,14 +1,5 @@
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  updateDoc,
-  increment,
-} from 'firebase/firestore'
-import { firebaseEnabled, firestore } from './firebase'
+import { get, increment, ref, remove, set, update } from 'firebase/database'
+import { firebaseEnabled, rtdb } from './firebase'
 import { defaultAds, defaultCategories, defaultPerformers, defaultSettings, defaultTags, defaultVideos, applyLegalCopy } from './seed'
 import type { Ad, Category, Performer, SiteSettings, Tag, Video } from '../types'
 
@@ -44,31 +35,61 @@ function ensureLocalSeed() {
   if (!localStorage.getItem(KEYS.settings)) writeLs(KEYS.settings, defaultSettings)
 }
 
-async function colDocs<T extends { id: string }>(name: string): Promise<T[]> {
-  if (!firestore) return []
-  const snap = await getDocs(collection(firestore, name))
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as object) })) as T[]
+function clean(value: unknown): unknown {
+  if (value === undefined) return null
+  if (Array.isArray(value)) return value.map(clean)
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v === undefined) continue
+      out[k] = clean(v)
+    }
+    return out
+  }
+  return value
 }
 
-async function putDoc(name: string, id: string, data: Record<string, unknown>) {
-  if (!firestore) return
-  await setDoc(doc(firestore, name, id), data, { merge: true })
+function mapRows<T extends { id: string }>(raw: unknown): T[] {
+  if (!raw || typeof raw !== 'object') return []
+  return Object.entries(raw as Record<string, object>).map(([id, row]) => ({ id, ...row }) as T)
 }
+
+async function timedGet(path: string) {
+  if (!rtdb) return null
+  const work = get(ref(rtdb, path))
+  const winner = await Promise.race([
+    work.then((snap) => ({ ok: true as const, snap })),
+    new Promise<{ ok: false }>((resolve) => {
+      setTimeout(() => resolve({ ok: false }), 4000)
+    }),
+  ])
+  if (!winner.ok) return null
+  return winner.snap.val()
+}
+
+async function listPath<T extends { id: string }>(path: string): Promise<T[]> {
+  return mapRows<T>(await timedGet(path))
+}
+
+async function putPath(path: string, data: Record<string, unknown>) {
+  if (!rtdb) return
+  await set(ref(rtdb, path), clean(data))
+}
+
+const remote = () => Boolean(firebaseEnabled && rtdb)
 
 export const db = {
   async listVideos(): Promise<Video[]> {
-    if (firebaseEnabled && firestore) {
-      const rows = await colDocs<Video>('videos')
-      return rows.sort((a, b) => b.createdAt - a.createdAt)
+    if (remote()) {
+      return (await listPath<Video>('videos')).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
     }
     ensureLocalSeed()
     return readLs<Video[]>(KEYS.videos, []).sort((a, b) => b.createdAt - a.createdAt)
   },
 
   async saveVideo(video: Video) {
-    if (firebaseEnabled && firestore) {
-      const { id, ...rest } = video
-      await putDoc('videos', id, rest)
+    if (remote()) {
+      await putPath(`videos/${video.id}`, video as unknown as Record<string, unknown>)
       return
     }
     ensureLocalSeed()
@@ -80,8 +101,8 @@ export const db = {
   },
 
   async deleteVideo(id: string) {
-    if (firebaseEnabled && firestore) {
-      await deleteDoc(doc(firestore, 'videos', id))
+    if (remote() && rtdb) {
+      await remove(ref(rtdb, `videos/${id}`))
       return
     }
     writeLs(
@@ -91,42 +112,46 @@ export const db = {
   },
 
   async bumpViews(id: string) {
-    if (firebaseEnabled && firestore) {
-      await updateDoc(doc(firestore, 'videos', id), { views: increment(1) })
-      return
+    try {
+      if (remote() && rtdb) {
+        await update(ref(rtdb, `videos/${id}`), { views: increment(1) })
+        return
+      }
+      const all = readLs<Video[]>(KEYS.videos, [])
+      writeLs(
+        KEYS.videos,
+        all.map((v) => (v.id === id ? { ...v, views: v.views + 1 } : v)),
+      )
+    } catch {
+      /* public increment may be blocked until rules are published */
     }
-    const all = readLs<Video[]>(KEYS.videos, [])
-    writeLs(
-      KEYS.videos,
-      all.map((v) => (v.id === id ? { ...v, views: v.views + 1 } : v)),
-    )
   },
 
   async bumpLikes(id: string) {
-    if (firebaseEnabled && firestore) {
-      await updateDoc(doc(firestore, 'videos', id), { likes: increment(1) })
-      return
+    try {
+      if (remote() && rtdb) {
+        await update(ref(rtdb, `videos/${id}`), { likes: increment(1) })
+        return
+      }
+      const all = readLs<Video[]>(KEYS.videos, [])
+      writeLs(
+        KEYS.videos,
+        all.map((v) => (v.id === id ? { ...v, likes: v.likes + 1 } : v)),
+      )
+    } catch {
+      /* public increment may be blocked until rules are published */
     }
-    const all = readLs<Video[]>(KEYS.videos, [])
-    writeLs(
-      KEYS.videos,
-      all.map((v) => (v.id === id ? { ...v, likes: v.likes + 1 } : v)),
-    )
   },
 
   async listCategories(): Promise<Category[]> {
-    if (firebaseEnabled && firestore) {
-      const rows = await colDocs<Category>('categories')
-      return rows.sort((a, b) => a.order - b.order)
-    }
+    if (remote()) return (await listPath<Category>('categories')).sort((a, b) => (a.order || 0) - (b.order || 0))
     ensureLocalSeed()
     return readLs<Category[]>(KEYS.categories, []).sort((a, b) => a.order - b.order)
   },
 
   async saveCategory(row: Category) {
-    if (firebaseEnabled && firestore) {
-      const { id, ...rest } = row
-      await putDoc('categories', id, rest)
+    if (remote()) {
+      await putPath(`categories/${row.id}`, row as unknown as Record<string, unknown>)
       return
     }
     const all = readLs<Category[]>(KEYS.categories, [])
@@ -137,8 +162,8 @@ export const db = {
   },
 
   async deleteCategory(id: string) {
-    if (firebaseEnabled && firestore) {
-      await deleteDoc(doc(firestore, 'categories', id))
+    if (remote() && rtdb) {
+      await remove(ref(rtdb, `categories/${id}`))
       return
     }
     writeLs(
@@ -148,15 +173,14 @@ export const db = {
   },
 
   async listTags(): Promise<Tag[]> {
-    if (firebaseEnabled && firestore) return colDocs<Tag>('tags')
+    if (remote()) return listPath<Tag>('tags')
     ensureLocalSeed()
     return readLs<Tag[]>(KEYS.tags, [])
   },
 
   async saveTag(row: Tag) {
-    if (firebaseEnabled && firestore) {
-      const { id, ...rest } = row
-      await putDoc('tags', id, rest)
+    if (remote()) {
+      await putPath(`tags/${row.id}`, row as unknown as Record<string, unknown>)
       return
     }
     const all = readLs<Tag[]>(KEYS.tags, [])
@@ -167,8 +191,8 @@ export const db = {
   },
 
   async deleteTag(id: string) {
-    if (firebaseEnabled && firestore) {
-      await deleteDoc(doc(firestore, 'tags', id))
+    if (remote() && rtdb) {
+      await remove(ref(rtdb, `tags/${id}`))
       return
     }
     writeLs(
@@ -178,15 +202,14 @@ export const db = {
   },
 
   async listPerformers(): Promise<Performer[]> {
-    if (firebaseEnabled && firestore) return colDocs<Performer>('performers')
+    if (remote()) return listPath<Performer>('performers')
     ensureLocalSeed()
     return readLs<Performer[]>(KEYS.performers, [])
   },
 
   async savePerformer(row: Performer) {
-    if (firebaseEnabled && firestore) {
-      const { id, ...rest } = row
-      await putDoc('performers', id, rest)
+    if (remote()) {
+      await putPath(`performers/${row.id}`, row as unknown as Record<string, unknown>)
       return
     }
     const all = readLs<Performer[]>(KEYS.performers, [])
@@ -197,8 +220,8 @@ export const db = {
   },
 
   async deletePerformer(id: string) {
-    if (firebaseEnabled && firestore) {
-      await deleteDoc(doc(firestore, 'performers', id))
+    if (remote() && rtdb) {
+      await remove(ref(rtdb, `performers/${id}`))
       return
     }
     writeLs(
@@ -208,15 +231,14 @@ export const db = {
   },
 
   async listAds(): Promise<Ad[]> {
-    if (firebaseEnabled && firestore) return colDocs<Ad>('ads')
+    if (remote()) return listPath<Ad>('ads')
     ensureLocalSeed()
     return readLs<Ad[]>(KEYS.ads, [])
   },
 
   async saveAd(row: Ad) {
-    if (firebaseEnabled && firestore) {
-      const { id, ...rest } = row
-      await putDoc('ads', id, rest)
+    if (remote()) {
+      await putPath(`ads/${row.id}`, row as unknown as Record<string, unknown>)
       return
     }
     const all = readLs<Ad[]>(KEYS.ads, [])
@@ -227,8 +249,8 @@ export const db = {
   },
 
   async deleteAd(id: string) {
-    if (firebaseEnabled && firestore) {
-      await deleteDoc(doc(firestore, 'ads', id))
+    if (remote() && rtdb) {
+      await remove(ref(rtdb, `ads/${id}`))
       return
     }
     writeLs(
@@ -238,9 +260,8 @@ export const db = {
   },
 
   async getSettings(): Promise<SiteSettings> {
-    if (firebaseEnabled && firestore) {
-      const snap = await getDoc(doc(firestore, 'settings', 'site'))
-      const data = snap.exists() ? (snap.data() as SiteSettings) : defaultSettings
+    if (remote() && rtdb) {
+      const data = ((await timedGet('settings/site')) || {}) as Partial<SiteSettings>
       return applyLegalCopy({ ...defaultSettings, ...data, uploadSecret: '' })
     }
     ensureLocalSeed()
@@ -248,27 +269,26 @@ export const db = {
   },
 
   async getPrivateSettings(): Promise<{ uploadSecret: string }> {
-    if (firebaseEnabled && firestore) {
-      const snap = await getDoc(doc(firestore, 'settings', 'private'))
-      if (!snap.exists()) return { uploadSecret: '' }
-      return { uploadSecret: String((snap.data() as { uploadSecret?: string }).uploadSecret || '') }
+    if (remote() && rtdb) {
+      const data = ((await timedGet('settings/private')) || {}) as { uploadSecret?: string }
+      return { uploadSecret: String(data.uploadSecret || '') }
     }
     const s = readLs<SiteSettings>(KEYS.settings, defaultSettings)
     return { uploadSecret: s.uploadSecret || '' }
   },
 
   async saveSettings(row: SiteSettings) {
-    if (firebaseEnabled && firestore) {
+    if (remote()) {
       const { uploadSecret, ...publicRow } = row
-      await putDoc('settings', 'site', publicRow as unknown as Record<string, unknown>)
-      await putDoc('settings', 'private', { uploadSecret })
+      await putPath('settings/site', publicRow as unknown as Record<string, unknown>)
+      await putPath('settings/private', { uploadSecret: uploadSecret || '' })
       return
     }
     writeLs(KEYS.settings, row)
   },
 
   async seedDefaults() {
-    if (firebaseEnabled && firestore) {
+    if (remote()) {
       for (const row of defaultCategories) await this.saveCategory(row)
       for (const row of defaultTags) await this.saveTag(row)
       for (const row of defaultPerformers) await this.savePerformer(row)

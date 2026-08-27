@@ -26,7 +26,7 @@ export function Latest() {
   const { slice, pages, p } = pageOf(published, Number(sp.get('page') || 1))
   return (
     <div>
-      <Seo title={`${tr('latest', lang)} | DeshiX`} />
+      <Seo title={`${tr('latest', lang)} | FeedBoss`} />
       <h1 className="mb-4 text-2xl font-bold">{tr('latest', lang)}</h1>
       <VideoGrid videos={slice} />
       <Pagination page={p} pages={pages} makeHref={(n) => `/latest?page=${n}`} />
@@ -40,7 +40,7 @@ export function Trending() {
   const list = published.filter((v) => v.trending)
   return (
     <div>
-      <Seo title={`${tr('trending', lang)} | DeshiX`} />
+      <Seo title={`${tr('trending', lang)} | FeedBoss`} />
       <h1 className="mb-4 text-2xl font-bold">{tr('trending', lang)}</h1>
       <VideoGrid videos={list} />
     </div>
@@ -58,7 +58,7 @@ export function CategoryPage() {
   const title = cat ? pick(cat, lang, 'name') : tr('categories', lang)
   return (
     <div>
-      <Seo title={`${title} | DeshiX`} />
+      <Seo title={`${title} | FeedBoss`} />
       <h1 className="mb-2 text-2xl font-bold">{title}</h1>
       {cat && <p className="mb-4 text-sm text-muted">{lang === 'bn' ? cat.descriptionBn : cat.descriptionEn}</p>}
       <VideoGrid videos={slice} />
@@ -75,7 +75,7 @@ export function TagPage() {
   const list = published.filter((v) => tag && v.tagIds.includes(tag.id))
   return (
     <div>
-      <Seo title={`#${tag ? pick(tag, lang, 'name') : slug} | DeshiX`} />
+      <Seo title={`#${tag ? pick(tag, lang, 'name') : slug} | FeedBoss`} />
       <h1 className="mb-4 text-2xl font-bold">#{tag ? pick(tag, lang, 'name') : slug}</h1>
       <VideoGrid videos={list} />
     </div>
@@ -100,7 +100,7 @@ export function SearchPage() {
 
   return (
     <div>
-      <Seo title={`${tr('results', lang)} | DeshiX`} />
+      <Seo title={`${tr('results', lang)} | FeedBoss`} />
       <h1 className="mb-4 text-2xl font-bold">
         {tr('results', lang)}: {q}
       </h1>
@@ -114,7 +114,7 @@ export function CategoriesPage() {
   const { categories, published } = useSite()
   return (
     <div>
-      <Seo title={`${tr('categories', lang)} | DeshiX`} />
+      <Seo title={`${tr('categories', lang)} | FeedBoss`} />
       <h1 className="mb-4 text-2xl font-bold">{tr('categories', lang)}</h1>
       <div className="video-grid">
         {categories.map((c) => {
@@ -148,7 +148,7 @@ export function ModelsPage() {
   const { performers, published } = useSite()
   return (
     <div>
-      <Seo title={`${tr('models', lang)} | DeshiX`} />
+      <Seo title={`${tr('models', lang)} | FeedBoss`} />
       <h1 className="mb-4 text-2xl font-bold">{tr('models', lang)}</h1>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {performers.map((m) => {
@@ -177,7 +177,7 @@ export function ModelPage() {
   if (!model) return <p className="text-muted">{tr('noVideos', lang)}</p>
   return (
     <div>
-      <Seo title={`${model.name} | DeshiX`} />
+      <Seo title={`${model.name} | FeedBoss`} />
       <div className="mb-6 flex items-center gap-4">
         <div className="h-20 w-20 overflow-hidden rounded-full bg-raised">
           {model.avatarUrl ? <img src={model.avatarUrl} alt="" className="h-full w-full object-cover" /> : null}
@@ -205,7 +205,7 @@ export function LegalPage({ kind }: { kind: 'about' | 'terms' | 'privacy' | 'dmc
   const item = map[kind]
   return (
     <div className="card p-6">
-      <Seo title={`${item.t} | DeshiX`} />
+      <Seo title={`${item.t} | FeedBoss`} />
       <h1 className="mb-4 text-2xl font-bold">{item.t}</h1>
       <div className="prose-legal">{item.body}</div>
     </div>

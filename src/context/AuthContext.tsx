@@ -5,9 +5,9 @@ import {
   signOut,
   type User,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { get, ref, set } from 'firebase/database'
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { adminEmail, auth, firebaseEnabled, firestore } from '../lib/firebase'
+import { adminEmail, auth, firebaseEnabled, rtdb } from '../lib/firebase'
 
 const DEMO_EMAIL = 'admin@deshix.com'
 const DEMO_PASS = 'admin123'
@@ -25,20 +25,20 @@ type Ctx = {
 const AuthContext = createContext<Ctx | null>(null)
 
 async function ensureAdminDoc(user: User) {
-  if (!firestore) return
+  if (!rtdb) return
   const email = (user.email || '').toLowerCase()
-  const ref = doc(firestore, 'admins', user.uid)
-  const snap = await getDoc(ref)
+  const node = ref(rtdb, `admins/${user.uid}`)
+  const snap = await get(node)
   if (snap.exists()) return
   if (adminEmail && email !== adminEmail) return
-  await setDoc(ref, { email, createdAt: Date.now(), role: 'admin' })
+  await set(node, { email, createdAt: Date.now(), role: 'admin' })
 }
 
 async function isAdminUser(user: User) {
   const email = (user.email || '').toLowerCase()
   if (adminEmail && email === adminEmail) return true
-  if (!firestore) return false
-  const snap = await getDoc(doc(firestore, 'admins', user.uid))
+  if (!rtdb) return false
+  const snap = await get(ref(rtdb, `admins/${user.uid}`))
   return snap.exists()
 }
 
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const allowed = await isAdminUser(cred.user)
     if (!allowed) {
       await signOut(auth)
-      throw new Error('This email is not an admin. Add the UID in Firestore admins, or set VITE_ADMIN_EMAIL.')
+      throw new Error('This email is not an admin. Set VITE_ADMIN_EMAIL to this email.')
     }
     setUser({ uid: cred.user.uid, email: cred.user.email || '' })
   }

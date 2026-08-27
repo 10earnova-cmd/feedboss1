@@ -4,7 +4,7 @@ compatibility_date = "2026-08-01"
 
 [vars]
 # PUBLIC_BASE_URL = "https://cdn.yourdomain.com"
-# ALLOWED_ORIGIN = "https://yourdomain.com"
+ALLOWED_ORIGIN = "https://getvideo.fun"
 # FIREBASE_WEB_API_KEY = ""
 # ADMIN_EMAILS = "you@example.com"
 # UPLOAD_SECRET = "change-this-long-random-secret"

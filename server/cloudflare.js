@@ -2,6 +2,8 @@
  * Cloudflare Worker: /api/upload + /api/file/* against R2 bucket `feedboss`.
  * Static Vite files are served from dist via wrangler assets (SPA).
  */
+import { preflight, withCors } from './cors.js'
+
 const folders = new Set(['videos', 'thumbs', 'images'])
 
 function json(data, status = 200) {
@@ -105,19 +107,26 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url)
 
-    if (url.pathname === '/api/health') {
-      return json({ ok: true, bucket: 'feedboss' })
-    }
-    if (url.pathname === '/api/upload' && request.method === 'POST') {
-      return handleUpload(request, env)
-    }
-    if (url.pathname.startsWith('/api/file/') && request.method === 'GET') {
-      return handleFile(request, env, url.pathname)
-    }
-    if (url.pathname.startsWith('/api/')) {
-      return json({ error: 'Not found' }, 404)
+    if (request.method === 'OPTIONS' && url.pathname.startsWith('/api/')) {
+      return preflight(request, env)
     }
 
-    return env.ASSETS.fetch(request)
+    let res
+    if (url.pathname === '/api/health') {
+      res = json({ ok: true, bucket: 'feedboss' })
+    } else if (url.pathname === '/api/upload' && request.method === 'POST') {
+      res = await handleUpload(request, env)
+    } else if (url.pathname.startsWith('/api/file/') && (request.method === 'GET' || request.method === 'HEAD')) {
+      res = await handleFile(request, env, url.pathname)
+      if (request.method === 'HEAD' && res.body) {
+        res = new Response(null, { status: res.status, headers: res.headers })
+      }
+    } else if (url.pathname.startsWith('/api/')) {
+      res = json({ error: 'Not found' }, 404)
+    } else {
+      return env.ASSETS.fetch(request)
+    }
+
+    return withCors(res, request, env)
   },
 }

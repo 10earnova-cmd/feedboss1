@@ -1,0 +1,50 @@
+{
+  "rules": {
+    "videos": {
+      ".read": true,
+      "$id": {
+        ".write": "auth != null",
+        "views": {
+          ".write": true,
+          ".validate": "newData.isNumber()"
+        },
+        "likes": {
+          ".write": true,
+          ".validate": "newData.isNumber()"
+        }
+      }
+    },
+    "categories": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "tags": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "performers": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "ads": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "settings": {
+      "site": {
+        ".read": true,
+        ".write": "auth != null"
+      },
+      "private": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "admins": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    }
+  }
+}

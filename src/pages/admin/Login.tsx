@@ -9,7 +9,7 @@ export function AdminLogin() {
   const navigate = useNavigate()
   const [email, setEmail] = useState(firebaseEnabled ? '' : 'admin@deshix.com')
   const [password, setPassword] = useState(firebaseEnabled ? '' : 'admin123')
-  const [mode, setMode] = useState<'login' | 'register'>(firebaseEnabled ? 'register' : 'login')
+  const [mode, setMode] = useState<'login' | 'register'>('login')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -30,14 +30,14 @@ export function AdminLogin() {
 
   return (
     <div className="grid min-h-svh place-items-center bg-ink px-4">
-      <Seo title="Admin login | DeshiX" />
+      <Seo title="Admin login | FeedBoss" />
       <form onSubmit={(e) => void onSubmit(e)} className="card w-full max-w-md p-6">
         <h1 className="font-display text-2xl font-extrabold">
-          Deshi<span className="text-accent">X</span> Admin
+          Feed<span className="text-accent">Boss</span> Admin
         </h1>
         <p className="mt-1 text-sm text-muted">
           {firebaseEnabled
-            ? 'Firebase Auth is on. Enable Email/Password in the console, then create an admin account here.'
+            ? 'Firebase Auth + Realtime Database. Enable Email/Password, then login with the admin email.'
             : 'Demo mode — Firebase is not connected yet.'}
         </p>
         {!firebaseEnabled && (

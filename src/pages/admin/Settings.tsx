@@ -47,7 +47,7 @@ export function AdminSettings() {
       <Seo title="Settings | Admin" />
       <h1 className="text-2xl font-bold">Settings</h1>
       <p className="mt-1 text-sm text-muted">
-        Data store: {firebaseEnabled ? 'Firebase Firestore is on' : 'Local demo (localStorage) — add Firebase keys in .env'}
+        Data store: {firebaseEnabled ? 'Firebase Realtime Database is on' : 'Local demo (localStorage) — add Firebase keys in .env'}
       </p>
       {msg && <p className="mt-2 text-sm text-gold">{msg}</p>}
 

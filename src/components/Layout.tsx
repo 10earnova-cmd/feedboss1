@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom'
+import { Brand } from './Brand'
 import { useAge } from '../context/AgeContext'
 import { useLang } from '../context/LangContext'
 import { useSite } from '../context/SiteContext'
@@ -16,10 +17,7 @@ export function Layout() {
     return (
       <div className="grid min-h-svh place-items-center bg-ink px-4">
         <div className="card w-full max-w-lg p-8 text-center">
-          <p className="logo text-4xl">
-            {(lang === 'bn' ? settings.siteNameBn : settings.siteNameEn).replace(/x|X|এক্স/i, '')}
-            <span className="logo-x">X</span>
-          </p>
+          <Brand className="text-4xl" />
           <h1 className="mt-4 text-xl font-bold">{tr('ageTitle', lang)}</h1>
           <p className="mt-3 text-sm leading-relaxed text-muted">
             {lang === 'bn' ? settings.ageGateBn : settings.ageGateEn}

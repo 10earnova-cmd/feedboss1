@@ -1,6 +1,7 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
+import { corsHeaderRecord, preflight } from './cors.js'
 
 const bucket = process.env.R2_BUCKET || 'feedboss'
 const endpoint = process.env.R2_ENDPOINT
@@ -46,6 +47,13 @@ async function verifyFirebase(token) {
 }
 
 const app = new Hono()
+
+app.use('/api/*', async (c, next) => {
+  if (c.req.method === 'OPTIONS') return preflight(c.req.raw, process.env)
+  await next()
+  const extra = corsHeaderRecord(c.req.raw, process.env)
+  for (const [k, v] of Object.entries(extra)) c.res.headers.set(k, v)
+})
 
 app.onError((err, c) => {
   console.error(err)

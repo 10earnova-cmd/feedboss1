@@ -35,7 +35,7 @@ export function AdminLayout() {
       <aside className="border-b border-line bg-panel lg:border-r lg:border-b-0">
         <div className="flex items-center justify-between px-4 py-4">
           <a href="/" className="font-display text-xl font-extrabold">
-            Deshi<span className="text-accent">X</span>
+            Feed<span className="text-accent">Boss</span>
             <span className="ml-2 text-xs text-muted">ADMIN</span>
           </a>
         </div>

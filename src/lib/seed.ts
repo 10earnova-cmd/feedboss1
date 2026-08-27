@@ -16,8 +16,8 @@ function id(prefix: string, n: number) {
 }
 
 export const defaultSettings: SiteSettings = {
-  siteNameEn: 'DeshiX',
-  siteNameBn: 'দেশিএক্স',
+  siteNameEn: 'FeedBoss',
+  siteNameBn: 'FeedBoss',
   taglineEn: "Bangladesh's #1 adult video tube — 18+ only",
   taglineBn: 'বাংলাদেশের #১ অ্যাডাল্ট ভিডিও টিউব — শুধুমাত্র ১৮+',
   logoUrl: '',
