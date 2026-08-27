@@ -1,8 +1,35 @@
-/** Main poster = exact middle of the video (50%). Extra frames for hover rotate. */
-export const POSTER_PCT = 0.5
-export const SCENE_PCTS = [0.5, 0.25, 0.75]
+/** Main home poster = scene at 1:00 (or earlier on short clips). */
+export const POSTER_AT_SEC = 60
 
-/** Common video containers accepted for upload (browser may not play every codec). */
+/** @deprecated use posterTime / sceneCaptureTimes */
+export const POSTER_PCT = 0.15
+export const SCENE_PCTS = [0.15, 0.3, 0.45, 0.6, 0.75]
+
+/** 1 minute into the video when long enough; short clips use an early readable frame. */
+export function posterTime(duration?: number) {
+  if (!duration || !Number.isFinite(duration) || duration <= 0) return 10
+  if (duration >= 70) return POSTER_AT_SEC
+  if (duration >= 25) return Math.min(duration * 0.4, duration - 2)
+  return Math.max(0.5, Math.min(duration * 0.35, duration - 0.5))
+}
+
+/** First time is always the 1-min poster; rest are mid-video frames for auto-rotate. */
+export function sceneCaptureTimes(duration?: number) {
+  const d = duration && Number.isFinite(duration) && duration > 0 ? duration : 0
+  const first = posterTime(d || 120)
+  if (!d || d < 20) return [first]
+  const extras = [0.22, 0.38, 0.52, 0.68, 0.82].map((f) => Math.min(d * 0.96, Math.max(1, d * f)))
+  const out: number[] = [first]
+  for (const t of extras) {
+    if (out.every((x) => Math.abs(x - t) > 6)) out.push(Math.round(t * 10) / 10)
+  }
+  return out.slice(0, 6)
+}
+
+export function sceneTime(duration?: number, pct = POSTER_PCT) {
+  if (!duration || !Number.isFinite(duration) || duration <= 0) return 2
+  return Math.min(duration * 0.96, Math.max(0.12, duration * pct))
+}
 export const VIDEO_EXTENSIONS = [
   'mp4',
   'webm',
@@ -82,11 +109,6 @@ export function mimeForVideoExt(ext: string, fallback = 'application/octet-strea
     f4v: 'video/x-f4v',
   }
   return map[e] || fallback
-}
-
-export function sceneTime(duration?: number, pct = POSTER_PCT) {
-  if (!duration || !Number.isFinite(duration) || duration <= 0) return 2
-  return Math.min(duration * 0.96, Math.max(0.12, duration * pct))
 }
 
 export function videoFrameUrl(src: string, seconds = 2) {

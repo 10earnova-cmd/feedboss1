@@ -87,7 +87,7 @@ export function VideoEdit() {
     let cancelled = false
     let started = false
     const run = async () => {
-      setMsg('Taking mid-point poster (50%) and scenes from the video…')
+      setMsg('Taking 1:00 poster and mid scenes for home rotate…')
       try {
         const blobs = await captureScenes(el)
         if (cancelled || !blobs.length) return

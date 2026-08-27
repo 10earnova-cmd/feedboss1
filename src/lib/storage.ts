@@ -1,4 +1,4 @@
-import { parseHlsDuration, pickHlsPlaylist, rewriteHlsPlaylist, hlsRelativePath, sanitizeHlsPath, SCENE_PCTS, sceneTime, mimeForVideoExt, videoExt } from './media'
+import { parseHlsDuration, pickHlsPlaylist, rewriteHlsPlaylist, hlsRelativePath, sanitizeHlsPath, sceneCaptureTimes, mimeForVideoExt, videoExt } from './media'
 import { auth } from './firebase'
 
 export type UploadProgress = (pct: number) => void
@@ -301,13 +301,18 @@ export function seekVideo(video: HTMLVideoElement, time: number) {
   })
 }
 
-export async function captureScenes(video: HTMLVideoElement, percents = SCENE_PCTS): Promise<Blob[]> {
+export async function captureScenes(video: HTMLVideoElement, times?: number[]): Promise<Blob[]> {
   const dur = video.duration
-  const pts = Number.isFinite(dur) && dur > 0 ? percents : [0.5]
+  const pts =
+    times && times.length
+      ? times
+      : Number.isFinite(dur) && dur > 0
+        ? sceneCaptureTimes(dur)
+        : [60]
   const blobs: Blob[] = []
-  for (const p of pts) {
-    await seekVideo(video, sceneTime(dur, p))
-    if (video.readyState < 2) await new Promise((r) => window.setTimeout(r, 120))
+  for (const t of pts) {
+    await seekVideo(video, t)
+    if (video.readyState < 2) await new Promise((r) => window.setTimeout(r, 80))
     blobs.push(await captureThumb(video))
   }
   return blobs

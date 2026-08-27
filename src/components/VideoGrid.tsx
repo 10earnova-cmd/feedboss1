@@ -5,12 +5,18 @@ import type { Video } from '../types'
 
 export function VideoGrid({ videos }: { videos: Video[] }) {
   useEffect(() => {
-    const urls: string[] = []
+    // First: main 1-min posters (fast paint). Then mid scenes for rotate.
+    const posters: string[] = []
+    const extras: string[] = []
     for (const v of videos) {
-      if (v.thumbnailUrl) urls.push(v.thumbnailUrl)
-      for (const s of v.previewUrls || []) if (s) urls.push(s)
+      if (v.thumbnailUrl) posters.push(v.thumbnailUrl)
+      for (const s of v.previewUrls || []) {
+        if (s && s !== v.thumbnailUrl) extras.push(s)
+      }
     }
-    prefetchPosters(urls)
+    prefetchPosters(posters)
+    const id = window.setTimeout(() => prefetchPosters(extras.slice(0, 40)), 400)
+    return () => window.clearTimeout(id)
   }, [videos])
 
   return (

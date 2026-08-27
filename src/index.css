@@ -133,6 +133,13 @@ a {
 .thumb-scene {
   position: absolute;
   inset: 0;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.thumb-scene.on {
+  opacity: 1;
 }
 
 .thumb video {

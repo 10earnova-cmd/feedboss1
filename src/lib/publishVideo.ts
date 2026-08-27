@@ -1,5 +1,5 @@
 import { db, newId } from './db'
-import { POSTER_PCT, SCENE_PCTS, sceneTime, isVideoFile } from './media'
+import { posterTime, sceneCaptureTimes, isVideoFile } from './media'
 import { slugify, uniqueSlug } from './slug'
 import { captureThumb, captureScenes, seekVideo, uploadHlsPack, uploadMedia } from './storage'
 import { prepareVideoForUpload } from './transcode'
@@ -36,7 +36,7 @@ async function waitMeta(video: HTMLVideoElement) {
   })
 }
 
-async function scenesFromFile(file: File, fullScenes: boolean): Promise<{ duration: number; scenes: File[] }> {
+async function scenesFromFile(file: File): Promise<{ duration: number; scenes: File[] }> {
   const url = URL.createObjectURL(file)
   const video = document.createElement('video')
   video.muted = true
@@ -49,13 +49,13 @@ async function scenesFromFile(file: File, fullScenes: boolean): Promise<{ durati
   try {
     await waitMeta(video)
     const duration = Math.round(video.duration || 0)
-    const pts = fullScenes ? SCENE_PCTS : [POSTER_PCT]
+    const times = sceneCaptureTimes(duration)
     let blobs: Blob[] = []
     try {
-      blobs = await captureScenes(video, duration > 0 ? pts : [POSTER_PCT])
+      blobs = await captureScenes(video, times)
     } catch {
       try {
-        await seekVideo(video, sceneTime(duration, POSTER_PCT))
+        await seekVideo(video, posterTime(duration))
         blobs = [await captureThumb(video)]
       } catch {
         blobs = []
@@ -98,7 +98,7 @@ export async function publishVideoFile(opts: {
   if (!text) throw new Error('Add a caption')
   opts.onProgress?.(2)
 
-  const scenesTask = scenesFromFile(opts.file, false).catch(() => ({ duration: 0, scenes: [] as File[] }))
+  const scenesTask = scenesFromFile(opts.file).catch(() => ({ duration: 0, scenes: [] as File[] }))
 
   const prepared = await prepareVideoForUpload(opts.file, (pct) => {
     opts.onProgress?.(Math.min(70, Math.round(pct * 0.7)))
