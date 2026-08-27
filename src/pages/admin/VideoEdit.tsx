@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Seo } from '../../components/Seo'
 import { useSite } from '../../context/SiteContext'
 import { db, newId } from '../../lib/db'
-import { isHlsUrl, mediaCrossOrigin, parseHlsDuration, pickHlsPlaylist, VIDEO_ACCEPT, isVideoFile } from '../../lib/media'
+import { isHlsUrl, mediaCrossOrigin, parseHlsDuration, pickHlsPlaylist, VIDEO_ACCEPT, isVideoFile, usablePoster } from '../../lib/media'
+import { generateAndUploadPosters } from '../../lib/autoPosters'
 import { captureScenes, readVideoMeta, uploadHlsPack, uploadMedia } from '../../lib/storage'
 import { prepareVideoForUpload } from '../../lib/transcode'
 import { slugify, uniqueSlug } from '../../lib/slug'
@@ -192,11 +193,12 @@ export function VideoEdit() {
         videoUrl = up.url
         if (up.duration) duration = up.duration
       } else if (videoFile) {
-        setMsg('Making browser-safe MP4 + 1:00 poster on this device…')
+        setMsg('Making browser-safe MP4 + posters on this device…')
         const prepared = await prepareVideoForUpload(videoFile, (pct, label) => {
           setProgress(Math.min(70, pct))
           setMsg(label)
         })
+        if (!prepared.thumbs.length) throw new Error('Poster capture failed on device')
         setMsg('Uploading MP4 + posters to Cloudflare…')
         const up = await uploadMedia({
           file: prepared.file,
@@ -257,6 +259,20 @@ export function VideoEdit() {
         if (previewUrls[0]) thumbnailUrl = previewUrls[0]
       }
 
+      // Always auto-generate posters if still missing (HLS uploads, old rows, etc.)
+      if (videoUrl && !usablePoster(thumbnailUrl)) {
+        setMsg('Auto-generating posters from video…')
+        setProgress(92)
+        const posters = await generateAndUploadPosters({
+          videoUrl,
+          duration,
+          workerUrl,
+          uploadSecret: secret,
+        })
+        thumbnailUrl = posters.thumbnailUrl
+        previewUrls = posters.previewUrls
+      }
+
       const payload: Video = {
         ...form,
         titleBn: text,
@@ -276,6 +292,7 @@ export function VideoEdit() {
         createdAt: isNew ? Date.now() : form.createdAt,
       }
       if (!payload.videoUrl) throw new Error('Select a video file')
+      if (!usablePoster(payload.thumbnailUrl)) throw new Error('Poster required — upload failed to create thumbs')
       await db.saveVideo(payload)
       await refresh()
       navigate('/admin/videos')

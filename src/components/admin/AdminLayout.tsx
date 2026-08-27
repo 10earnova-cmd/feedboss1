@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { Clapperboard, Files, Megaphone, Upload } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { AdminLogin } from '../../pages/admin/Login'
+import { PosterAutoRepair } from './PosterAutoRepair'
 
 const links = [
   { to: '/admin', icon: Upload, label: 'Upload', end: true },
@@ -64,6 +65,7 @@ export function AdminLayout() {
           </button>
         </div>
         <div className="p-4 lg:p-8">
+          <PosterAutoRepair />
           <Outlet />
         </div>
       </div>

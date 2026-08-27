@@ -47,6 +47,10 @@ export async function publishVideoFile(opts: {
   })
   opts.onProgress?.(72)
 
+  if (!prepared.thumbs.length) {
+    throw new Error('Poster capture failed on device — try another file')
+  }
+
   const [videoUp, previewUrls] = await Promise.all([
     uploadMedia({
       file: prepared.file,
@@ -57,6 +61,9 @@ export async function publishVideoFile(opts: {
     }),
     uploadAllThumbs(prepared.thumbs, opts.workerUrl, opts.uploadSecret),
   ])
+  if (!previewUrls.length) {
+    throw new Error('Poster upload failed — check R2 /api/sign')
+  }
   opts.onProgress?.(96)
 
   // duration from browser meta if possible

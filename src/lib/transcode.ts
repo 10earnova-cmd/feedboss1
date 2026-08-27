@@ -124,6 +124,7 @@ async function grabThumbs(ffmpeg: FFmpeg, input: string, duration: number) {
       }
     }
   }
+  if (!thumbs.length) throw new Error('Could not grab any poster frames')
   return thumbs
 }
 
