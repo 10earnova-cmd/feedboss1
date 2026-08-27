@@ -1,5 +1,6 @@
 import { parseHlsDuration, pickHlsPlaylist, rewriteHlsPlaylist, hlsRelativePath, sanitizeHlsPath, SCENE_PCTS, sceneTime } from './media'
-import { auth } from './firebase'
+import { auth, storage } from './firebase'
+import { getDownloadURL, ref as storageRef, uploadBytesResumable } from 'firebase/storage'
 
 export type UploadProgress = (pct: number) => void
 
@@ -21,6 +22,15 @@ export function mediaApiUrl(workerUrl?: string) {
   return raw.replace(/\/$/, '') || '/api'
 }
 
+function shouldUseFirebaseStorage(workerUrl: string) {
+  if (!storage || !auth?.currentUser) return false
+  if (/^https?:\/\//i.test(workerUrl) && !/getvideo\.fun/i.test(workerUrl)) return false
+  if (typeof window === 'undefined') return Boolean(import.meta.env.PROD)
+  const host = window.location.hostname
+  if (host === 'localhost' || host === '127.0.0.1') return false
+  return true
+}
+
 function publicMediaUrl(workerUrl: string, key: string, returned?: string) {
   if (returned && /^https?:\/\//i.test(returned)) return returned
   const pub = String(import.meta.env.VITE_R2_PUBLIC_BASE || '').replace(/\/$/, '')
@@ -36,6 +46,52 @@ function publicMediaUrl(workerUrl: string, key: string, returned?: string) {
     return returned
   }
   return `${workerUrl}/file/${key}`
+}
+
+function contentTypeOf(file: File, key: string) {
+  if (file.type) return file.type
+  const lower = key.toLowerCase()
+  if (lower.endsWith('.m3u8')) return 'application/vnd.apple.mpegurl'
+  if (lower.endsWith('.ts')) return 'video/MP2T'
+  if (lower.endsWith('.mp4')) return 'video/mp4'
+  if (lower.endsWith('.webm')) return 'video/webm'
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg'
+  return 'application/octet-stream'
+}
+
+function uploadToFirebase(opts: {
+  file: File
+  key: string
+  onProgress?: UploadProgress
+}): Promise<{ url: string; key: string }> {
+  if (!storage) return Promise.reject(new Error('Firebase Storage is not configured'))
+  const object = storageRef(storage, opts.key)
+  const task = uploadBytesResumable(object, opts.file, {
+    contentType: contentTypeOf(opts.file, opts.key),
+    cacheControl: 'public,max-age=31536000',
+  })
+  return new Promise((resolve, reject) => {
+    task.on(
+      'state_changed',
+      (snap) => {
+        if (snap.totalBytes && opts.onProgress) {
+          opts.onProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100))
+        }
+      },
+      (err) => {
+        const code = (err as { code?: string }).code || ''
+        if (code.includes('unauthorized') || code.includes('unauthenticated')) {
+          reject(new Error('Storage permission denied. In Firebase Console → Storage → Rules, allow read for all and write for the admin email.'))
+          return
+        }
+        reject(err)
+      },
+      async () => {
+        const url = await getDownloadURL(task.snapshot.ref)
+        resolve({ url, key: opts.key })
+      },
+    )
+  })
 }
 
 export async function uploadMedia(opts: {
@@ -55,6 +111,10 @@ export async function uploadMedia(opts: {
   }
 
   const keyHint = opts.key || `${opts.folder}/${crypto.randomUUID()}.${extOf(opts.file)}`
+
+  if (shouldUseFirebaseStorage(workerUrl)) {
+    return uploadToFirebase({ file: opts.file, key: keyHint, onProgress: opts.onProgress })
+  }
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -98,7 +158,7 @@ export async function uploadHlsPack(opts: {
 
   const packId = crypto.randomUUID()
   const nameMap: Record<string, string> = {}
-  const prepared: { file: File; key: string; isPlaylist: boolean }[] = []
+  const prepared: { file: File; key: string; original: string; isPlaylist: boolean }[] = []
 
   for (const file of opts.files) {
     const original = hlsRelativePath(file).replace(/^\.\//, '')
@@ -108,6 +168,7 @@ export async function uploadHlsPack(opts: {
     nameMap[file.name] = rel.split('/').pop() || rel
     prepared.push({
       file,
+      original,
       key: `videos/${packId}/${rel}`,
       isPlaylist: file.name.toLowerCase().endsWith('.m3u8'),
     })
@@ -120,15 +181,30 @@ export async function uploadHlsPack(opts: {
   let playlistKey = ''
   let duration = 0
   const total = prepared.length
+  const segments = prepared.filter((item) => !item.isPlaylist)
+  const lists = prepared.filter((item) => item.isPlaylist)
 
-  for (const item of prepared) {
-    let file = item.file
-    if (item.isPlaylist) {
-      const text = await item.file.text()
-      duration = Math.max(duration, parseHlsDuration(text))
-      const rewritten = rewriteHlsPlaylist(text, nameMap)
-      file = new File([rewritten], item.file.name, { type: 'application/vnd.apple.mpegurl' })
-    }
+  for (const item of segments) {
+    const up = await uploadMedia({
+      file: item.file,
+      folder: 'videos',
+      workerUrl: opts.workerUrl,
+      uploadSecret: opts.uploadSecret,
+      key: item.key,
+      onProgress: (pct) => opts.onProgress?.(Math.round(((done + pct / 100) / total) * 100)),
+    })
+    nameMap[item.original] = up.url
+    nameMap[item.file.name] = up.url
+    nameMap[item.key.split('/').pop() || item.file.name] = up.url
+    done += 1
+    opts.onProgress?.(Math.round((done / total) * 100))
+  }
+
+  for (const item of lists) {
+    const text = await item.file.text()
+    duration = Math.max(duration, parseHlsDuration(text))
+    const rewritten = rewriteHlsPlaylist(text, nameMap)
+    const file = new File([rewritten], item.file.name, { type: 'application/vnd.apple.mpegurl' })
     const up = await uploadMedia({
       file,
       folder: 'videos',

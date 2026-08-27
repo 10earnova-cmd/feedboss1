@@ -97,6 +97,7 @@ export function mediaCrossOrigin(src?: string): 'anonymous' | undefined {
     if (u.pathname.startsWith('/api/file/')) return 'anonymous'
     const host = u.hostname.toLowerCase()
     if (host === 'getvideo.fun' || host.endsWith('.getvideo.fun') || host.endsWith('.workers.dev')) return 'anonymous'
+    if (host.endsWith('firebasestorage.googleapis.com') || host.endsWith('firebaseapp.com')) return 'anonymous'
   } catch {
     /* ignore */
   }
