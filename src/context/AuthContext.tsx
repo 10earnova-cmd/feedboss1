@@ -6,7 +6,7 @@ import {
 } from 'firebase/auth'
 import { get, ref, set } from 'firebase/database'
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { adminEmail, auth, firebaseEnabled, rtdb } from '../lib/firebase'
+import { adminEmail, auth, firebaseEnabled, isOwnerEmail, rtdb } from '../lib/firebase'
 
 const DEMO_EMAIL = 'admin@deshix.com'
 const DEMO_PASS = 'admin123'
@@ -24,20 +24,28 @@ const AuthContext = createContext<Ctx | null>(null)
 
 async function ensureAdminDoc(user: User) {
   if (!rtdb) return
-  const email = (user.email || '').toLowerCase()
-  const node = ref(rtdb, `admins/${user.uid}`)
-  const snap = await get(node)
-  if (snap.exists()) return
-  if (adminEmail && email !== adminEmail) return
-  await set(node, { email, createdAt: Date.now(), role: 'admin' })
+  const email = (user.email || '').trim().toLowerCase()
+  if (!isOwnerEmail(email)) return
+  try {
+    const node = ref(rtdb, `admins/${user.uid}`)
+    const snap = await get(node)
+    if (snap.exists()) return
+    await set(node, { email, createdAt: Date.now(), role: 'admin' })
+  } catch {
+    /* RTDB can 404 on the wrong region host; owner email is still admin. */
+  }
 }
 
 async function isAdminUser(user: User) {
-  const email = (user.email || '').toLowerCase()
-  if (adminEmail && email === adminEmail) return true
+  const email = (user.email || '').trim().toLowerCase()
+  if (isOwnerEmail(email)) return true
   if (!rtdb) return false
-  const snap = await get(ref(rtdb, `admins/${user.uid}`))
-  return snap.exists()
+  try {
+    const snap = await get(ref(rtdb, `admins/${user.uid}`))
+    return snap.exists()
+  } catch {
+    return false
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -81,12 +89,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       throw new Error('Demo login:  admin@deshix.com  /  admin123')
     }
-    const cred = await signInWithEmailAndPassword(auth, email, password)
+    const cred = await signInWithEmailAndPassword(auth, email.trim(), password)
     await ensureAdminDoc(cred.user)
     const allowed = await isAdminUser(cred.user)
     if (!allowed) {
       await signOut(auth)
-      throw new Error('This email is not an admin. Set VITE_ADMIN_EMAIL to this email.')
+      throw new Error(`This email is not an admin. Sign in with ${adminEmail}`)
     }
     setUser({ uid: cred.user.uid, email: cred.user.email || '' })
   }

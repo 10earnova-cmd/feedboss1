@@ -1,12 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { adminEmail } from '../../lib/firebase'
 import { Seo } from '../../components/Seo'
 
 export function AdminLogin() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(adminEmail)
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -32,7 +33,7 @@ export function AdminLogin() {
         <h1 className="font-display text-2xl font-extrabold">
           Feed<span className="text-accent">Boss</span> Admin
         </h1>
-        <p className="mt-1 text-sm text-muted">Sign in with the admin account.</p>
+        <p className="mt-1 text-sm text-muted">Sign in with the admin account only.</p>
         <label className="mt-4 block text-sm">Email</label>
         <input className="input mt-1" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="username" />
         <label className="mt-3 block text-sm">Password</label>

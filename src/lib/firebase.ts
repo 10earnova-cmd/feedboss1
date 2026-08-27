@@ -25,9 +25,18 @@ let rtdb: Database | null = null
 if (firebaseEnabled) {
   app = initializeApp(config)
   auth = getAuth(app)
-  rtdb = getDatabase(app)
+  rtdb = getDatabase(app, config.databaseURL)
 }
 
 export { app, auth, rtdb }
 
-export const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'am@gmail.com').trim().toLowerCase()
+const OWNER_EMAILS = ['am@gmail.com']
+
+export const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || OWNER_EMAILS[0]).trim().toLowerCase()
+
+export function isOwnerEmail(email?: string | null) {
+  const value = (email || '').trim().toLowerCase()
+  if (!value) return false
+  if (OWNER_EMAILS.includes(value)) return true
+  return Boolean(adminEmail) && value === adminEmail
+}
