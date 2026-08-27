@@ -14,13 +14,7 @@
   ],
   "headers": [
     {
-      "source": "/api/file/(thumbs|images)/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=86400" }
-      ]
-    },
-    {
-      "source": "/((?!assets/|api/file/).*)",
+      "source": "/((?!assets/|api/).*)",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
       ]

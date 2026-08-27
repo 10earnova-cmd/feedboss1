@@ -10,18 +10,15 @@ export function VideoPlayer({ src, poster, title }: { src: string; poster: strin
     const video = el.current
     if (!video || !src) return
     setErr('')
-
-    const onVideoError = () => {
-      setErr('Playback failed. Re-upload from admin — downloader MP4s often need device compress to H.264 HLS.')
-    }
-    video.addEventListener('error', onVideoError)
-
-    // Do NOT set crossOrigin on the player — R2 redirects + missing CORS block many downloader MP4s.
     video.removeAttribute('crossorigin')
 
     if (!isHlsUrl(src)) {
+      const onVideoError = () => {
+        setErr('Video could not play. Open Admin → re-publish so it becomes browser-safe H.264.')
+      }
       video.preload = 'auto'
       video.src = src
+      video.addEventListener('error', onVideoError)
       return () => {
         video.removeEventListener('error', onVideoError)
         video.removeAttribute('src')
@@ -33,30 +30,25 @@ export function VideoPlayer({ src, poster, title }: { src: string; poster: strin
       video.preload = 'auto'
       video.src = src
       return () => {
-        video.removeEventListener('error', onVideoError)
         video.removeAttribute('src')
         video.load()
       }
     }
 
     if (Hls.isSupported()) {
+      let networkTries = 0
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
-        maxBufferLength: 120,
-        maxMaxBufferLength: 360,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 180,
         backBufferLength: 30,
-        maxBufferSize: 150 * 1000 * 1000,
-        maxBufferHole: 0.5,
-        highBufferWatchdogPeriod: 1,
-        nudgeMaxRetry: 8,
         startFragPrefetch: true,
         testBandwidth: true,
         progressive: true,
         capLevelToPlayerSize: true,
         startLevel: -1,
         xhrSetup: (xhr) => {
-          // Same-origin /api/file playlists + segments (302 to R2).
           xhr.withCredentials = false
         },
       })
@@ -71,7 +63,8 @@ export function VideoPlayer({ src, poster, title }: { src: string; poster: strin
       })
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal) return
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && networkTries < 3) {
+          networkTries += 1
           hls.startLoad()
           return
         }
@@ -79,17 +72,15 @@ export function VideoPlayer({ src, poster, title }: { src: string; poster: strin
           hls.recoverMediaError()
           return
         }
-        setErr('Stream error. Re-upload the video from admin (device compress → HLS).')
+        setErr('Stream failed to load. Wait for deploy, hard refresh, then re-publish if still broken.')
         hls.destroy()
       })
       return () => {
-        video.removeEventListener('error', onVideoError)
         hls.destroy()
       }
     }
 
-    setErr('This browser cannot play HLS. Try Chrome / Safari.')
-    return () => video.removeEventListener('error', onVideoError)
+    setErr('This browser cannot play HLS. Try Chrome or Safari.')
   }, [src])
 
   return (

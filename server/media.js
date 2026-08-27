@@ -56,6 +56,11 @@ export function isPlaylistKey(key) {
     .endsWith('.m3u8')
 }
 
+export function isHlsSegmentKey(key) {
+  const lower = String(key || '').toLowerCase()
+  return lower.endsWith('.ts') || lower.endsWith('.m4s')
+}
+
 export function uploadCacheControl(key) {
   return isImageKey(key) ? 'public, max-age=86400' : undefined
 }
