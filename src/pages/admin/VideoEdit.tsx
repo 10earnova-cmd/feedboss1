@@ -192,7 +192,7 @@ export function VideoEdit() {
         videoUrl = up.url
         if (up.duration) duration = up.duration
       } else if (videoFile) {
-        setMsg('Fixing / compressing on your device (Xmaster downloads need this)…')
+        setMsg('Light prepare on device (remux first, heavy encode only if needed)…')
         const prepared = await prepareVideoForUpload(videoFile, (pct, label) => {
           setProgress(Math.min(70, pct))
           setMsg(label)
@@ -272,7 +272,7 @@ export function VideoEdit() {
       <Seo title={isNew ? 'Upload' : 'Edit video'} />
       <h1 className="text-2xl font-bold">{isNew ? 'Upload' : 'Edit video'}</h1>
       <p className="mt-1 text-sm text-muted">
-        Device compress fixes Xmaster/downloader files (HEVC / broken MP4 → H.264). Then upload to Cloudflare.
+        Light prepare: remux when possible (device stays cool). Encode only for Xmaster/HEVC files — one fast pass.
       </p>
       {isNew ? (
         <p className="mt-2 text-sm">

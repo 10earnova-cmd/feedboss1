@@ -123,7 +123,7 @@ export function BulkUpload() {
       <Seo title="Bulk upload | Admin" />
       <h1 className="text-2xl font-bold">Bulk upload</h1>
       <p className="mt-1 text-sm text-muted">
-        Select any format. Compression runs on this phone/PC (your CPU), then the smaller HLS pack uploads to Cloudflare.
+        Light prepare on this device (remux first). Heavy compress only when the file needs it, then upload.
       </p>
       <p className="mt-2 text-sm">
         <Link className="text-accent" to="/admin">
