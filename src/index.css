@@ -243,7 +243,6 @@ a {
   display: flex;
   flex: 1;
   min-width: 0;
-  max-width: 560px;
 }
 
 .header-search input {
@@ -459,12 +458,7 @@ a {
 }
 
 @media (max-width: 768px) {
-  .header-main {
-    flex-wrap: wrap;
-  }
-  .header-search {
-    order: 5;
-    flex: 1 1 100%;
-    max-width: none;
+  .search-go {
+    padding: 8px 10px;
   }
 }

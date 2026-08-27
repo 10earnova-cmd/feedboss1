@@ -1,7 +1,7 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { NavLink, Outlet } from 'react-router-dom'
 import { Clapperboard, FolderOpen, LayoutDashboard, Megaphone, Settings, Tags, Upload, Users } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { AdminLogin } from '../../pages/admin/Login'
 
 const links = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
@@ -16,19 +16,16 @@ const links = [
 
 export function AdminLayout() {
   const { user, loading, logout } = useAuth()
-  const navigate = useNavigate()
 
-  useEffect(() => {
-    if (!loading && !user) navigate('/admin/login', { replace: true })
-  }, [loading, user, navigate])
-
-  if (loading || !user) {
+  if (loading) {
     return (
       <div className="grid min-h-svh place-items-center bg-ink">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-accent border-t-transparent" />
       </div>
     )
   }
+
+  if (!user) return <AdminLogin />
 
   return (
     <div lang="en" className="min-h-svh bg-ink lg:grid lg:grid-cols-[240px_1fr]">
