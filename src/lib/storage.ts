@@ -111,6 +111,13 @@ export async function uploadMedia(opts: {
     throw new Error(signError)
   }
 
+  const local =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  if (!local) {
+    throw new Error(`${signError}. Hard refresh the admin page (Ctrl+Shift+R) and try again.`)
+  }
+
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('POST', `${workerUrl}/upload`)
