@@ -192,12 +192,12 @@ export function VideoEdit() {
         videoUrl = up.url
         if (up.duration) duration = up.duration
       } else if (videoFile) {
-        setMsg('Converting to HLS (remux first, quality kept)…')
+        setMsg('Compressing on your device, then upload…')
         const hls = await transcodeToHls(videoFile, (pct, label) => {
           setProgress(Math.min(70, pct))
           setMsg(label)
         })
-        setMsg('Uploading HLS to Cloudflare R2…')
+        setMsg('Uploading compressed HLS to Cloudflare…')
         const up = await uploadHlsPack({
           files: hls.files,
           workerUrl,
@@ -259,7 +259,7 @@ export function VideoEdit() {
       <Seo title={isNew ? 'Upload' : 'Edit video'} />
       <h1 className="text-2xl font-bold">{isNew ? 'Upload' : 'Edit video'}</h1>
       <p className="mt-1 text-sm text-muted">
-        Any format is remuxed/encoded to HLS (m3u8) first — remux keeps quality; then files go to Cloudflare R2. Player preloads ahead segments.
+        Your device compresses the video first (smaller MB), then uploads HLS (m3u8) to Cloudflare. Player preloads ahead.
       </p>
       {isNew ? (
         <p className="mt-2 text-sm">

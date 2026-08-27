@@ -123,7 +123,7 @@ export function BulkUpload() {
       <Seo title="Bulk upload | Admin" />
       <h1 className="text-2xl font-bold">Bulk upload</h1>
       <p className="mt-1 text-sm text-muted">
-        Select any video format. Each file is remuxed to HLS (quality kept when possible), then uploaded to Cloudflare. Player streams m3u8 with ahead buffering.
+        Select any format. Compression runs on this phone/PC (your CPU), then the smaller HLS pack uploads to Cloudflare.
       </p>
       <p className="mt-2 text-sm">
         <Link className="text-accent" to="/admin">

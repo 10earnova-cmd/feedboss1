@@ -17,20 +17,23 @@ function withFfmpegLock<T>(fn: () => Promise<T>): Promise<T> {
   return run
 }
 
+function mb(n: number) {
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
 async function getFfmpeg(onProgress?: TranscodeProgress) {
   if (ffmpegSingleton?.loaded) return ffmpegSingleton
   if (loadPromise) return loadPromise
 
   loadPromise = (async () => {
-    onProgress?.(2, 'Loading compressor…')
+    onProgress?.(2, 'Loading compressor on this device…')
     const ffmpeg = new FFmpeg()
     ffmpeg.on('log', () => undefined)
     ffmpeg.on('progress', ({ progress }) => {
       const pct = Math.max(0, Math.min(99, Math.round((progress || 0) * 100)))
-      onProgress?.(8 + Math.round(pct * 0.72), 'Compressing to HLS…')
+      onProgress?.(10 + Math.round(pct * 0.7), `Compressing on your device… ${pct}%`)
     })
 
-    // Single-thread core: works without COOP/COEP; still remux-first for speed.
     const base = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm'
     await ffmpeg.load({
       coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript'),
@@ -64,10 +67,12 @@ async function readHlsOutputs(ffmpeg: FFmpeg) {
 
   const files: File[] = []
   let duration = 0
+  let totalBytes = 0
   for (const name of names) {
     const data = await ffmpeg.readFile(name)
     const bytes = data instanceof Uint8Array ? data : new TextEncoder().encode(String(data))
     const copy = new Uint8Array(bytes)
+    totalBytes += copy.byteLength
     if (name.endsWith('.m3u8')) {
       const text = new TextDecoder().decode(copy)
       duration = Math.max(duration, parseHlsDuration(text))
@@ -76,7 +81,7 @@ async function readHlsOutputs(ffmpeg: FFmpeg) {
       files.push(new File([copy], name, { type: 'video/MP2T' }))
     }
   }
-  return { files, duration }
+  return { files, duration, totalBytes }
 }
 
 async function cleanupFs(ffmpeg: FFmpeg, extra: string[]) {
@@ -94,9 +99,8 @@ async function cleanupFs(ffmpeg: FFmpeg, extra: string[]) {
 }
 
 /**
- * Any video → HLS (m3u8 + .ts) for Cloudflare R2 streaming.
- * Fast path: remux with codec copy (no quality loss).
- * Fallback: H.264 CRF 18 + AAC (visually lossless, ultrafast preset).
+ * Compress on the user's device (CPU/WASM), then return HLS pack for R2 upload.
+ * H.264 CRF 23 + AAC 128k, max 1080p — smaller MB, still sharp for tube streaming.
  */
 export async function transcodeToHls(file: File, onProgress?: TranscodeProgress) {
   return withFfmpegLock(async () => {
@@ -104,12 +108,38 @@ export async function transcodeToHls(file: File, onProgress?: TranscodeProgress)
       throw new Error('Already an HLS playlist — select the playlist with its .ts files')
     }
 
+    const srcSize = file.size
     const ffmpeg = await getFfmpeg(onProgress)
     const input = inputNameFor(file)
-    onProgress?.(5, 'Reading video…')
+    onProgress?.(6, `Reading ${mb(srcSize)} on this device…`)
     await ffmpeg.writeFile(input, await fetchFile(file))
 
-    const commonTail = [
+    onProgress?.(10, 'Compressing with your device power…')
+    const code = await ffmpeg.exec([
+      '-i',
+      input,
+      '-map',
+      '0:v:0',
+      '-map',
+      '0:a:0?',
+      '-vf',
+      "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease",
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-crf',
+      '23',
+      '-pix_fmt',
+      'yuv420p',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '128k',
+      '-ac',
+      '2',
+      '-ar',
+      '44100',
       '-f',
       'hls',
       '-hls_time',
@@ -121,64 +151,22 @@ export async function transcodeToHls(file: File, onProgress?: TranscodeProgress)
       '-hls_segment_filename',
       'seg%03d.ts',
       'index.m3u8',
-    ]
-
-    onProgress?.(8, 'Fast remux to HLS (no quality loss)…')
-    let mode: 'copy' | 'encode' = 'copy'
-    let code = await ffmpeg.exec([
-      '-i',
-      input,
-      '-map',
-      '0:v:0',
-      '-map',
-      '0:a:0?',
-      '-c',
-      'copy',
-      ...commonTail,
     ])
-
-    const hasPlaylist = (await ffmpeg.listDir('/')).some((e) => !e.isDir && e.name === 'index.m3u8')
-    if (code !== 0 || !hasPlaylist) {
-      await cleanupFs(ffmpeg, [input])
-      await ffmpeg.writeFile(input, await fetchFile(file))
-      mode = 'encode'
-      onProgress?.(10, 'Encoding high-quality H.264 HLS…')
-      code = await ffmpeg.exec([
-        '-i',
-        input,
-        '-map',
-        '0:v:0',
-        '-map',
-        '0:a:0?',
-        '-c:v',
-        'libx264',
-        '-preset',
-        'ultrafast',
-        '-crf',
-        '18',
-        '-pix_fmt',
-        'yuv420p',
-        '-c:a',
-        'aac',
-        '-b:a',
-        '192k',
-        '-ac',
-        '2',
-        '-ar',
-        '48000',
-        ...commonTail,
-      ])
-    }
 
     if (code !== 0) {
       await cleanupFs(ffmpeg, [input])
-      throw new Error('Could not convert this video. Try MP4/H.264, or a smaller file.')
+      throw new Error('Device compress failed. Try a smaller file or MP4.')
     }
 
-    onProgress?.(88, 'Packaging HLS files…')
+    onProgress?.(88, 'Packaging compressed HLS…')
     const out = await readHlsOutputs(ffmpeg)
     await cleanupFs(ffmpeg, [input])
-    onProgress?.(92, mode === 'copy' ? 'HLS ready (remux)' : 'HLS ready (encoded)')
-    return { ...out, mode }
+    const saved = srcSize > out.totalBytes ? srcSize - out.totalBytes : 0
+    const label =
+      saved > 0
+        ? `Compressed ${mb(srcSize)} → ${mb(out.totalBytes)} (saved ${mb(saved)})`
+        : `Compressed pack ${mb(out.totalBytes)} — ready to upload`
+    onProgress?.(92, label)
+    return { ...out, mode: 'encode' as const, srcBytes: srcSize, outBytes: out.totalBytes }
   })
 }
