@@ -192,37 +192,58 @@ export function VideoEdit() {
         videoUrl = up.url
         if (up.duration) duration = up.duration
       } else if (videoFile) {
-        setMsg('Light prepare on device (remux first, heavy encode only if needed)…')
+        setMsg('Making browser-safe MP4 + 1:00 poster on this device…')
         const prepared = await prepareVideoForUpload(videoFile, (pct, label) => {
           setProgress(Math.min(70, pct))
           setMsg(label)
         })
-        if (prepared.kind === 'hls') {
-          setMsg('Uploading HLS to Cloudflare…')
-          const up = await uploadHlsPack({
-            files: prepared.files,
-            workerUrl,
-            uploadSecret: secret,
-            onProgress: (pct) => setProgress(70 + Math.round(pct * 0.28)),
-          })
-          videoUrl = up.url
-          if (up.duration) duration = up.duration
-          else if (prepared.duration) duration = prepared.duration
-        } else {
-          setMsg('Uploading browser-safe MP4 to Cloudflare…')
-          const up = await uploadMedia({
-            file: prepared.file,
-            folder: 'videos',
-            workerUrl,
-            uploadSecret: secret,
-            onProgress: (pct) => setProgress(70 + Math.round(pct * 0.28)),
-          })
-          videoUrl = up.url
-          if (prepared.duration) duration = prepared.duration
+        setMsg('Uploading MP4 + posters to Cloudflare…')
+        const up = await uploadMedia({
+          file: prepared.file,
+          folder: 'videos',
+          workerUrl,
+          uploadSecret: secret,
+          onProgress: (pct) => setProgress(70 + Math.round(pct * 0.2)),
+        })
+        videoUrl = up.url
+        const thumbFiles = prepared.thumbs.length ? prepared.thumbs : sceneFiles
+        if (prepared.duration) duration = prepared.duration
+        else {
+          try {
+            const metaUrl = URL.createObjectURL(prepared.file)
+            duration = await new Promise<number>((resolve) => {
+              const v = document.createElement('video')
+              v.preload = 'metadata'
+              v.src = metaUrl
+              v.onloadedmetadata = () => {
+                const d = Math.round(v.duration || 0)
+                URL.revokeObjectURL(metaUrl)
+                resolve(d)
+              }
+              v.onerror = () => {
+                URL.revokeObjectURL(metaUrl)
+                resolve(0)
+              }
+            })
+          } catch {
+            /* keep */
+          }
         }
-      }
 
-      if (sceneFiles.length) {
+        if (thumbFiles.length) {
+          previewUrls = await Promise.all(
+            thumbFiles.map((file) =>
+              uploadMedia({
+                file,
+                folder: 'thumbs',
+                workerUrl,
+                uploadSecret: secret,
+              }).then((u) => u.url),
+            ),
+          )
+          if (previewUrls[0]) thumbnailUrl = previewUrls[0]
+        }
+      } else if (sceneFiles.length) {
         previewUrls = await Promise.all(
           sceneFiles.map((file) =>
             uploadMedia({

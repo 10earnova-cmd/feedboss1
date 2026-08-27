@@ -1,26 +1,18 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
-import { parseHlsDuration } from './media'
+import { posterTime, sceneCaptureTimes } from './media'
 
 export type TranscodeProgress = (pct: number, label: string) => void
 
-export type PreparedMedia =
-  | {
-      kind: 'hls'
-      files: File[]
-      duration: number
-      srcBytes: number
-      outBytes: number
-      mode: 'copy' | 'encode'
-    }
-  | {
-      kind: 'mp4'
-      file: File
-      duration: number
-      srcBytes: number
-      outBytes: number
-      mode: 'encode'
-    }
+export type PreparedMedia = {
+  kind: 'mp4'
+  file: File
+  thumbs: File[]
+  duration: number
+  srcBytes: number
+  outBytes: number
+  mode: 'encode'
+}
 
 let ffmpegSingleton: FFmpeg | null = null
 let loadPromise: Promise<FFmpeg> | null = null
@@ -49,7 +41,7 @@ async function getFfmpeg(onProgress?: TranscodeProgress) {
     ffmpeg.on('log', () => undefined)
     ffmpeg.on('progress', ({ progress }) => {
       const pct = Math.max(0, Math.min(99, Math.round((progress || 0) * 100)))
-      onProgress?.(15 + Math.round(pct * 0.7), `Light compress… ${pct}%`)
+      onProgress?.(12 + Math.round(pct * 0.55), `Making playable MP4… ${pct}%`)
     })
 
     const base = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm'
@@ -74,35 +66,6 @@ function inputNameFor(file: File) {
   return `input.${ext.slice(0, 5)}`
 }
 
-async function readHlsOutputs(ffmpeg: FFmpeg) {
-  const listing = await ffmpeg.listDir('/')
-  const names = listing
-    .filter((e) => !e.isDir && (e.name.endsWith('.m3u8') || e.name.endsWith('.ts')))
-    .map((e) => e.name)
-  const tsCount = names.filter((n) => n.endsWith('.ts')).length
-  if (!names.some((n) => n.endsWith('.m3u8')) || tsCount < 1) {
-    throw new Error('HLS pack incomplete')
-  }
-
-  const files: File[] = []
-  let duration = 0
-  let totalBytes = 0
-  for (const name of names) {
-    const data = await ffmpeg.readFile(name)
-    const bytes = data instanceof Uint8Array ? data : new TextEncoder().encode(String(data))
-    const copy = new Uint8Array(bytes)
-    totalBytes += copy.byteLength
-    if (name.endsWith('.m3u8')) {
-      const text = new TextDecoder().decode(copy)
-      duration = Math.max(duration, parseHlsDuration(text))
-      files.push(new File([copy], name, { type: 'application/vnd.apple.mpegurl' }))
-    } else {
-      files.push(new File([copy], name, { type: 'video/MP2T' }))
-    }
-  }
-  return { files, duration, totalBytes }
-}
-
 async function cleanupFs(ffmpeg: FFmpeg) {
   const listing = await ffmpeg.listDir('/').catch(() => [])
   for (const e of listing) {
@@ -111,7 +74,10 @@ async function cleanupFs(ffmpeg: FFmpeg) {
       e.name.endsWith('.m3u8') ||
       e.name.endsWith('.ts') ||
       e.name.endsWith('.mp4') ||
-      e.name.startsWith('input.')
+      e.name.endsWith('.jpg') ||
+      e.name.startsWith('input.') ||
+      e.name.startsWith('safe.') ||
+      e.name.startsWith('thumb')
     ) {
       try {
         await ffmpeg.deleteFile(e.name)
@@ -127,75 +93,50 @@ async function writeInput(ffmpeg: FFmpeg, file: File, input: string) {
   await ffmpeg.writeFile(input, await fetchFile(file))
 }
 
-const HLS_TAIL = [
-  '-f',
-  'hls',
-  '-hls_time',
-  '6',
-  '-hls_playlist_type',
-  'vod',
-  '-hls_flags',
-  'independent_segments',
-  '-hls_segment_filename',
-  'seg%03d.ts',
-  'index.m3u8',
-]
-
-/** Almost free on CPU — only repacks containers when codecs are already browser-friendly. */
-async function tryRemuxHls(ffmpeg: FFmpeg, input: string) {
-  const code = await ffmpeg.exec(['-i', input, '-map', '0:v:0', '-map', '0:a:0?', '-c', 'copy', ...HLS_TAIL])
-  if (code !== 0) throw new Error('remux failed')
-  return readHlsOutputs(ffmpeg)
+async function grabThumbs(ffmpeg: FFmpeg, input: string, duration: number) {
+  const times = sceneCaptureTimes(duration > 0 ? duration : 180)
+  const thumbs: File[] = []
+  for (let i = 0; i < times.length; i += 1) {
+    const out = `thumb${i}.jpg`
+    const code = await ffmpeg.exec(['-ss', String(times[i]), '-i', input, '-frames:v', '1', '-q:v', '4', '-y', out])
+    if (code !== 0) continue
+    try {
+      const data = await ffmpeg.readFile(out)
+      const bytes = data instanceof Uint8Array ? data : new Uint8Array()
+      if (bytes.byteLength < 500) continue
+      thumbs.push(new File([new Uint8Array(bytes)], out, { type: 'image/jpeg' }))
+      await ffmpeg.deleteFile(out)
+    } catch {
+      /* skip */
+    }
+  }
+  if (!thumbs.length) {
+    const out = 'thumb0.jpg'
+    const code = await ffmpeg.exec(['-i', input, '-frames:v', '1', '-q:v', '5', '-y', out])
+    if (code === 0) {
+      try {
+        const data = await ffmpeg.readFile(out)
+        const bytes = data instanceof Uint8Array ? data : new Uint8Array()
+        if (bytes.byteLength > 500) thumbs.push(new File([new Uint8Array(bytes)], out, { type: 'image/jpeg' }))
+        await ffmpeg.deleteFile(out)
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return thumbs
 }
 
-/** One light encode only — ultrafast, no multi-pass, mild scale. */
-async function tryLightEncodeHls(ffmpeg: FFmpeg, input: string) {
-  const code = await ffmpeg.exec([
-    '-fflags',
-    '+genpts',
-    '-i',
-    input,
-    '-map',
-    '0:v:0',
-    '-map',
-    '0:a:0?',
-    '-vf',
-    'scale=1280:-2:flags=fast_bilinear,format=yuv420p',
-    '-c:v',
-    'libx264',
-    '-preset',
-    'ultrafast',
-    '-tune',
-    'fastdecode',
-    '-crf',
-    '24',
-    '-threads',
-    '0',
-    '-c:a',
-    'aac',
-    '-b:a',
-    '96k',
-    '-ac',
-    '2',
-    '-ar',
-    '44100',
-    ...HLS_TAIL,
-  ])
-  if (code !== 0) throw new Error('encode hls failed')
-  return readHlsOutputs(ffmpeg)
-}
-
-async function tryLightMp4(ffmpeg: FFmpeg, input: string) {
+async function encodeMp4(ffmpeg: FFmpeg, input: string, withAudio: boolean) {
   const out = 'out.mp4'
-  const code = await ffmpeg.exec([
+  const args = [
     '-fflags',
     '+genpts',
     '-i',
     input,
     '-map',
     '0:v:0',
-    '-map',
-    '0:a:0?',
+    ...(withAudio ? ['-map', '0:a:0?'] : ['-an']),
     '-vf',
     'scale=1280:-2:flags=fast_bilinear,format=yuv420p',
     '-c:v',
@@ -206,36 +147,31 @@ async function tryLightMp4(ffmpeg: FFmpeg, input: string) {
     'fastdecode',
     '-crf',
     '24',
+    '-pix_fmt',
+    'yuv420p',
+    '-profile:v',
+    'baseline',
+    '-level',
+    '3.1',
     '-threads',
     '0',
-    '-c:a',
-    'aac',
-    '-b:a',
-    '96k',
-    '-ac',
-    '2',
+    ...(withAudio ? ['-c:a', 'aac', '-b:a', '96k', '-ac', '2', '-ar', '44100'] : []),
     '-movflags',
     '+faststart',
     '-y',
     out,
-  ])
-  if (code !== 0) throw new Error('mp4 failed')
+  ]
+  const code = await ffmpeg.exec(args)
+  if (code !== 0) throw new Error('mp4 encode failed')
   const data = await ffmpeg.readFile(out)
-  const bytes = data instanceof Uint8Array ? data : new TextEncoder().encode(String(data))
-  const copy = new Uint8Array(bytes)
-  if (copy.byteLength < 10_000) throw new Error('mp4 too small')
-  return {
-    file: new File([copy], 'video.mp4', { type: 'video/mp4' }),
-    totalBytes: copy.byteLength,
-    duration: 0,
-  }
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array()
+  if (bytes.byteLength < 10_000) throw new Error('mp4 too small')
+  return new File([new Uint8Array(bytes)], 'video.mp4', { type: 'video/mp4' })
 }
 
 /**
- * Light pipeline so the phone/PC does not melt:
- * 1) remux/copy (almost no CPU) when possible
- * 2) one ultrafast encode to HLS
- * 3) one ultrafast MP4 fallback
+ * Always output browser-safe progressive H.264 MP4 + 1:00 poster/scenes.
+ * More reliable on Chrome than WASM HLS packs.
  */
 export async function prepareVideoForUpload(file: File, onProgress?: TranscodeProgress): Promise<PreparedMedia> {
   return withFfmpegLock(async () => {
@@ -249,65 +185,42 @@ export async function prepareVideoForUpload(file: File, onProgress?: TranscodePr
     onProgress?.(6, `Reading ${mb(srcSize)}…`)
     await writeInput(ffmpeg, file, input)
 
-    // 1) Fast remux — normal MP4s finish here, device barely works.
+    onProgress?.(12, 'Making browser-safe H.264 MP4…')
+    let mp4: File
     try {
-      onProgress?.(10, 'Fast remux (light, no heavy compress)…')
-      const out = await tryRemuxHls(ffmpeg, input)
-      await cleanupFs(ffmpeg)
-      onProgress?.(92, `Ready HLS ${mb(out.totalBytes)} (remux)`)
-      return {
-        kind: 'hls',
-        files: out.files,
-        duration: out.duration,
-        srcBytes: srcSize,
-        outBytes: out.totalBytes,
-        mode: 'copy',
-      }
+      mp4 = await encodeMp4(ffmpeg, input, true)
     } catch {
-      /* Xmaster / HEVC need encode */
-    }
-
-    // 2) Single light encode only
-    try {
-      onProgress?.(18, 'Light H.264 compress (one pass)…')
       await writeInput(ffmpeg, file, input)
-      const out = await tryLightEncodeHls(ffmpeg, input)
-      await cleanupFs(ffmpeg)
-      const saved = Math.max(0, srcSize - out.totalBytes)
-      onProgress?.(92, `Ready HLS ${mb(out.totalBytes)}${saved ? ` · saved ${mb(saved)}` : ''}`)
-      return {
-        kind: 'hls',
-        files: out.files,
-        duration: out.duration,
-        srcBytes: srcSize,
-        outBytes: out.totalBytes,
-        mode: 'encode',
-      }
-    } catch {
-      /* last resort */
+      mp4 = await encodeMp4(ffmpeg, input, false)
     }
 
-    onProgress?.(40, 'Light MP4 fallback…')
-    await writeInput(ffmpeg, file, input)
-    const out = await tryLightMp4(ffmpeg, input)
+    onProgress?.(78, 'Grabbing 1:00 poster + mid scenes…')
     await cleanupFs(ffmpeg)
-    onProgress?.(92, `Ready MP4 ${mb(out.totalBytes)}`)
+    await ffmpeg.writeFile('safe.mp4', await fetchFile(mp4))
+    // duration unknown precisely here; sceneCaptureTimes still places 60s first when duration>=70
+    const thumbs = await grabThumbs(ffmpeg, 'safe.mp4', 600)
+    await cleanupFs(ffmpeg)
+
+    const saved = Math.max(0, srcSize - mp4.size)
+    onProgress?.(
+      92,
+      `Ready MP4 ${mb(mp4.size)}${saved ? ` · saved ${mb(saved)}` : ''} · ${thumbs.length} thumbs`,
+    )
     return {
       kind: 'mp4',
-      file: out.file,
-      duration: out.duration,
+      file: mp4,
+      thumbs,
+      duration: 0,
       srcBytes: srcSize,
-      outBytes: out.totalBytes,
+      outBytes: mp4.size,
       mode: 'encode',
     }
   })
 }
 
-/** @deprecated use prepareVideoForUpload */
 export async function transcodeToHls(file: File, onProgress?: TranscodeProgress) {
-  const prepared = await prepareVideoForUpload(file, onProgress)
-  if (prepared.kind !== 'hls') {
-    throw new Error('Could not build HLS — use prepareVideoForUpload MP4 fallback')
-  }
-  return prepared
+  return prepareVideoForUpload(file, onProgress)
 }
+
+void posterTime
+void sceneCaptureTimes

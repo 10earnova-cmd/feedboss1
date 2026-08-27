@@ -1,7 +1,7 @@
 export function contentTypeFor(key, fallback = 'application/octet-stream') {
   const lower = String(key || '').toLowerCase()
   if (lower.endsWith('.m3u8')) return 'application/vnd.apple.mpegurl'
-  if (lower.endsWith('.ts') || lower.endsWith('.mts') || lower.endsWith('.m2ts')) return 'video/MP2T'
+  if (lower.endsWith('.ts') || lower.endsWith('.mts') || lower.endsWith('.m2ts')) return 'video/mp2t'
   if (lower.endsWith('.m4s')) return 'video/iso.segment'
   if (lower.endsWith('.mp4') || lower.endsWith('.m4v')) return 'video/mp4'
   if (lower.endsWith('.webm')) return 'video/webm'

@@ -1,7 +1,7 @@
 import { db, newId } from './db'
-import { posterTime, sceneCaptureTimes, isVideoFile } from './media'
+import { isVideoFile } from './media'
 import { slugify, uniqueSlug } from './slug'
-import { captureThumb, captureScenes, seekVideo, uploadHlsPack, uploadMedia } from './storage'
+import { uploadMedia } from './storage'
 import { prepareVideoForUpload } from './transcode'
 import type { Video } from '../types'
 
@@ -13,62 +13,6 @@ export function isBulkVideoFile(file: File) {
   const name = file.name.toLowerCase()
   if (name.endsWith('.m3u8') || name.endsWith('.m4s')) return false
   return isVideoFile(file)
-}
-
-async function waitMeta(video: HTMLVideoElement) {
-  if (Number.isFinite(video.duration) && video.duration > 0 && video.readyState >= 1) return
-  await new Promise<void>((resolve, reject) => {
-    const timer = window.setTimeout(() => resolve(), 15000)
-    const ok = () => {
-      window.clearTimeout(timer)
-      resolve()
-    }
-    video.addEventListener('loadedmetadata', ok, { once: true })
-    video.addEventListener('loadeddata', ok, { once: true })
-    video.addEventListener(
-      'error',
-      () => {
-        window.clearTimeout(timer)
-        reject(new Error('Could not read video'))
-      },
-      { once: true },
-    )
-  })
-}
-
-async function scenesFromFile(file: File): Promise<{ duration: number; scenes: File[] }> {
-  const url = URL.createObjectURL(file)
-  const video = document.createElement('video')
-  video.muted = true
-  video.playsInline = true
-  video.preload = 'auto'
-  video.src = url
-  video.style.cssText = 'position:fixed;left:-9999px;width:16px;height:9px;opacity:0;pointer-events:none'
-  document.body.appendChild(video)
-
-  try {
-    await waitMeta(video)
-    const duration = Math.round(video.duration || 0)
-    const times = sceneCaptureTimes(duration)
-    let blobs: Blob[] = []
-    try {
-      blobs = await captureScenes(video, times)
-    } catch {
-      try {
-        await seekVideo(video, posterTime(duration))
-        blobs = [await captureThumb(video)]
-      } catch {
-        blobs = []
-      }
-    }
-    const scenes = blobs.map((b, i) => new File([b], `scene-${i}.jpg`, { type: 'image/jpeg' }))
-    return { duration, scenes }
-  } finally {
-    URL.revokeObjectURL(url)
-    video.removeAttribute('src')
-    video.load()
-    video.remove()
-  }
 }
 
 async function uploadAllThumbs(scenes: File[], workerUrl: string, uploadSecret: string) {
@@ -98,40 +42,46 @@ export async function publishVideoFile(opts: {
   if (!text) throw new Error('Add a caption')
   opts.onProgress?.(2)
 
-  const scenesTask = scenesFromFile(opts.file).catch(() => ({ duration: 0, scenes: [] as File[] }))
-
   const prepared = await prepareVideoForUpload(opts.file, (pct) => {
     opts.onProgress?.(Math.min(70, Math.round(pct * 0.7)))
   })
   opts.onProgress?.(72)
 
-  let videoUrl = ''
-  let duration = 0
-
-  if (prepared.kind === 'hls') {
-    const up = await uploadHlsPack({
-      files: prepared.files,
-      workerUrl: opts.workerUrl,
-      uploadSecret: opts.uploadSecret,
-      onProgress: (pct) => opts.onProgress?.(72 + Math.round(pct * 0.22)),
-    })
-    videoUrl = up.url
-    duration = up.duration || prepared.duration
-  } else {
-    const up = await uploadMedia({
+  const [videoUp, previewUrls] = await Promise.all([
+    uploadMedia({
       file: prepared.file,
       folder: 'videos',
       workerUrl: opts.workerUrl,
       uploadSecret: opts.uploadSecret,
-      onProgress: (pct) => opts.onProgress?.(72 + Math.round(pct * 0.22)),
-    })
-    videoUrl = up.url
-    duration = prepared.duration
-  }
-
-  const { duration: metaDur, scenes } = await scenesTask
-  const previewUrls = await uploadAllThumbs(scenes, opts.workerUrl, opts.uploadSecret)
+      onProgress: (pct) => opts.onProgress?.(72 + Math.round(pct * 0.2)),
+    }),
+    uploadAllThumbs(prepared.thumbs, opts.workerUrl, opts.uploadSecret),
+  ])
   opts.onProgress?.(96)
+
+  // duration from browser meta if possible
+  let duration = prepared.duration
+  if (!duration) {
+    try {
+      duration = await new Promise<number>((resolve) => {
+        const url = URL.createObjectURL(prepared.file)
+        const v = document.createElement('video')
+        v.preload = 'metadata'
+        v.src = url
+        v.onloadedmetadata = () => {
+          const d = Math.round(v.duration || 0)
+          URL.revokeObjectURL(url)
+          resolve(d)
+        }
+        v.onerror = () => {
+          URL.revokeObjectURL(url)
+          resolve(0)
+        }
+      })
+    } catch {
+      duration = 0
+    }
+  }
 
   const now = Date.now()
   const payload: Video = {
@@ -141,10 +91,10 @@ export async function publishVideoFile(opts: {
     titleBn: text,
     captionEn: text,
     captionBn: text,
-    videoUrl,
+    videoUrl: videoUp.url,
     thumbnailUrl: previewUrls[0] || '',
     previewUrls,
-    duration: duration || metaDur || 0,
+    duration,
     views: 0,
     likes: 0,
     categoryId: '',
