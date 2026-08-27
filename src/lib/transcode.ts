@@ -1,6 +1,6 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
-import { posterTime, sceneCaptureTimes } from './media'
+import { sceneCaptureTimes } from './media'
 
 export type TranscodeProgress = (pct: number, label: string) => void
 
@@ -194,11 +194,32 @@ export async function prepareVideoForUpload(file: File, onProgress?: TranscodePr
       mp4 = await encodeMp4(ffmpeg, input, false)
     }
 
-    onProgress?.(78, 'Grabbing 1:00 poster + mid scenes…')
+    onProgress?.(78, 'Grabbing ~10 scenes (1:00 + mid points)…')
     await cleanupFs(ffmpeg)
     await ffmpeg.writeFile('safe.mp4', await fetchFile(mp4))
-    // duration unknown precisely here; sceneCaptureTimes still places 60s first when duration>=70
-    const thumbs = await grabThumbs(ffmpeg, 'safe.mp4', 600)
+
+    let durationHint = 600
+    try {
+      durationHint = await new Promise<number>((resolve) => {
+        const url = URL.createObjectURL(mp4)
+        const v = document.createElement('video')
+        v.preload = 'metadata'
+        v.src = url
+        v.onloadedmetadata = () => {
+          const d = Math.round(v.duration || 0)
+          URL.revokeObjectURL(url)
+          resolve(d > 0 ? d : 600)
+        }
+        v.onerror = () => {
+          URL.revokeObjectURL(url)
+          resolve(600)
+        }
+      })
+    } catch {
+      durationHint = 600
+    }
+
+    const thumbs = await grabThumbs(ffmpeg, 'safe.mp4', durationHint)
     await cleanupFs(ffmpeg)
 
     const saved = Math.max(0, srcSize - mp4.size)
@@ -210,7 +231,7 @@ export async function prepareVideoForUpload(file: File, onProgress?: TranscodePr
       kind: 'mp4',
       file: mp4,
       thumbs,
-      duration: 0,
+      duration: durationHint,
       srcBytes: srcSize,
       outBytes: mp4.size,
       mode: 'encode',
@@ -221,6 +242,3 @@ export async function prepareVideoForUpload(file: File, onProgress?: TranscodePr
 export async function transcodeToHls(file: File, onProgress?: TranscodeProgress) {
   return prepareVideoForUpload(file, onProgress)
 }
-
-void posterTime
-void sceneCaptureTimes

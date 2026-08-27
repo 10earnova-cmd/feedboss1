@@ -1,16 +1,19 @@
+import { Play } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatDuration } from '../lib/format'
-import { isHlsUrl, mediaCrossOrigin, posterTime, sceneCaptureTimes, usablePoster, videoFrameUrl } from '../lib/media'
+import {
+  isHlsUrl,
+  mediaCrossOrigin,
+  posterTime,
+  SCENE_ROTATE_MS,
+  sceneCaptureTimes,
+  usablePoster,
+  videoFrameUrl,
+} from '../lib/media'
 import { isPosterWarm, markPosterLoaded, prefetchPoster } from '../lib/posterCache'
 
 let liveSeekers = 0
 const MAX_SEEKERS = 3
-
-function staggerMs(seed: string) {
-  let h = 0
-  for (let i = 0; i < seed.length; i += 1) h = (h * 31 + seed.charCodeAt(i)) >>> 0
-  return 900 + (h % 700)
-}
 
 export function VideoThumb({
   src,
@@ -32,20 +35,15 @@ export function VideoThumb({
   const [frame, setFrame] = useState(0)
   const [broken, setBroken] = useState<Record<string, true>>({})
 
-  const photos = useMemo(() => {
-    const list = uniqueFrames(poster, scenes).filter((u) => !broken[u])
-    return list
-  }, [poster, scenes, broken])
+  const photos = useMemo(() => uniqueFrames(poster, scenes).filter((u) => !broken[u]), [poster, scenes, broken])
 
   const at1min = posterTime(duration)
   const canSeek = Boolean(src && !isHlsUrl(src))
   const usePhotos = photos.length > 0
-  // Home: auto-rotate mid scenes whenever visible
   const cyclePhotos = Boolean(preview && inView && photos.length > 1)
   const needVideoPoster = Boolean(inView && canSeek && !usePhotos)
   const photo = photos[frame] || photos[0] || ''
   const warm = isPosterWarm(photo)
-  const tickMs = useMemo(() => staggerMs(photo || src || 'x'), [photo, src])
 
   useEffect(() => {
     setBroken({})
@@ -55,34 +53,29 @@ export function VideoThumb({
   useEffect(() => {
     const el = box.current
     if (!el) return
-    const io = new IntersectionObserver(
-      ([entry]) => setInView(entry.isIntersecting),
-      { rootMargin: '120px' },
-    )
+    const io = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), { rootMargin: '120px' })
     io.observe(el)
     return () => io.disconnect()
   }, [])
 
-  // Prefetch next rotate frames only when visible — smart, not all at once.
   useEffect(() => {
     if (!inView || !photos.length) return
     prefetchPoster(photos[0])
-    if (photos.length > 1) {
-      const id = window.setTimeout(() => {
-        for (let i = 1; i < photos.length; i += 1) prefetchPoster(photos[i])
-      }, 200)
-      return () => window.clearTimeout(id)
-    }
+    const id = window.setTimeout(() => {
+      for (let i = 1; i < photos.length; i += 1) prefetchPoster(photos[i])
+    }, 150)
+    return () => window.clearTimeout(id)
   }, [inView, photos])
 
+  // Every 2s change to another scene from the video.
   useEffect(() => {
     if (!cyclePhotos) {
       setFrame(0)
       return
     }
-    const id = window.setInterval(() => setFrame((n) => (n + 1) % photos.length), tickMs)
+    const id = window.setInterval(() => setFrame((n) => (n + 1) % photos.length), SCENE_ROTATE_MS)
     return () => window.clearInterval(id)
-  }, [cyclePhotos, photos.length, tickMs])
+  }, [cyclePhotos, photos.length])
 
   useEffect(() => {
     const v = vid.current
@@ -92,7 +85,7 @@ export function VideoThumb({
     liveSeekers += 1
     let gone = false
     let i = 0
-    const times = sceneCaptureTimes(duration || undefined)
+    const times = sceneCaptureTimes(duration || 600)
 
     const seek = (t: number) => {
       if (gone || !v) return
@@ -109,7 +102,7 @@ export function VideoThumb({
         ? window.setInterval(() => {
             seek(times[i % times.length] || at1min)
             i += 1
-          }, 1400)
+          }, SCENE_ROTATE_MS)
         : 0
 
     return () => {
@@ -169,6 +162,9 @@ export function VideoThumb({
           autoPlay={playVideo}
         />
       ) : null}
+      <span className="thumb-play" aria-hidden>
+        <Play className="thumb-play-icon" fill="currentColor" />
+      </span>
       <span className="hd">HD</span>
       {duration != null && duration > 0 ? <span className="badge">{formatDuration(duration)}</span> : null}
     </div>
@@ -177,7 +173,6 @@ export function VideoThumb({
 
 function uniqueFrames(poster?: string, scenes?: string[] | Record<string, string>) {
   const list = Array.isArray(scenes) ? scenes : scenes ? Object.values(scenes) : []
-  // Poster (1-min) first, then other mid scenes for rotate — no dupes.
   const out: string[] = []
   for (const url of [usablePoster(poster), ...list.map((s) => usablePoster(s))]) {
     if (url && !out.includes(url)) out.push(url)

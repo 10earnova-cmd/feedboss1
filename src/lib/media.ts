@@ -1,5 +1,6 @@
-/** Main home poster = scene at 1:00 (or earlier on short clips). */
+/** Main home poster starts near 1:00; rotate ~1 scene per minute of runtime. */
 export const POSTER_AT_SEC = 60
+export const SCENE_ROTATE_MS = 2000
 
 /** @deprecated use posterTime / sceneCaptureTimes */
 export const POSTER_PCT = 0.15
@@ -13,17 +14,22 @@ export function posterTime(duration?: number) {
   return Math.max(0.5, Math.min(duration * 0.35, duration - 0.5))
 }
 
-/** First time is always the 1-min poster; rest are mid-video frames for auto-rotate. */
+/**
+ * ~10 scenes for a 10‑min video (about one per minute), evenly spaced.
+ * First frame is always the 1:00 poster when the clip is long enough.
+ */
 export function sceneCaptureTimes(duration?: number) {
-  const d = duration && Number.isFinite(duration) && duration > 0 ? duration : 0
-  const first = posterTime(d || 120)
-  if (!d || d < 20) return [first]
-  const extras = [0.22, 0.38, 0.52, 0.68, 0.82].map((f) => Math.min(d * 0.96, Math.max(1, d * f)))
-  const out: number[] = [first]
-  for (const t of extras) {
-    if (out.every((x) => Math.abs(x - t) > 6)) out.push(Math.round(t * 10) / 10)
+  const d = duration && Number.isFinite(duration) && duration > 0 ? duration : 600
+  const count = Math.max(4, Math.min(12, Math.round(d / 60) || 10))
+  const oneMin = posterTime(d)
+  const out: number[] = [oneMin]
+  for (let i = 0; i < count; i += 1) {
+    const t = Math.min(d * 0.96, Math.max(0.5, d * (0.06 + (0.88 * i) / Math.max(1, count - 1))))
+    if (out.every((x) => Math.abs(x - t) > Math.max(4, d / 40))) {
+      out.push(Math.round(t * 10) / 10)
+    }
   }
-  return out.slice(0, 6)
+  return out.slice(0, count)
 }
 
 export function sceneTime(duration?: number, pct = POSTER_PCT) {
