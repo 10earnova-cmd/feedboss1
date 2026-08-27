@@ -30,4 +30,4 @@ if (firebaseEnabled) {
 
 export { app, auth, rtdb }
 
-export const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').trim().toLowerCase()
+export const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'am@gmail.com').trim().toLowerCase()
