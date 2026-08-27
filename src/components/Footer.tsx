@@ -1,18 +1,14 @@
 import { Link } from 'react-router-dom'
 import { Brand } from './Brand'
 import { useLang } from '../context/LangContext'
-import { useSite } from '../context/SiteContext'
-import { AdSlot } from './AdSlot'
 import { tr } from '../i18n'
 
 export function Footer() {
   const { lang } = useLang()
-  const { ads } = useSite()
 
   return (
     <footer className="mt-8 border-t border-line bg-[#0d0d0d]">
       <div className="page py-6">
-        <AdSlot slot="footer" ads={ads} className="mb-6" />
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="logo text-xl">
             <Brand />

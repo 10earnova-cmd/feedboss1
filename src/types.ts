@@ -75,6 +75,7 @@ export type Ad = {
   html: string
   url: string
   url2?: string
+  url3?: string
   labelEn: string
   labelBn: string
   enabled: boolean

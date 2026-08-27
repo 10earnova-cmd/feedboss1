@@ -1,17 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Clapperboard, FolderOpen, LayoutDashboard, Megaphone, Settings, Tags, Upload, Users } from 'lucide-react'
+import { Clapperboard, Megaphone, Upload } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { AdminLogin } from '../../pages/admin/Login'
 
 const links = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: '/admin', icon: Upload, label: 'Upload', end: true },
   { to: '/admin/videos', icon: Clapperboard, label: 'Videos', end: false },
-  { to: '/admin/videos/new', icon: Upload, label: 'New video', end: false },
-  { to: '/admin/categories', icon: FolderOpen, label: 'Categories', end: false },
-  { to: '/admin/tags', icon: Tags, label: 'Tags', end: false },
-  { to: '/admin/models', icon: Users, label: 'Models', end: false },
-  { to: '/admin/ads', icon: Megaphone, label: 'Ads / Monetag', end: false },
-  { to: '/admin/settings', icon: Settings, label: 'Settings', end: false },
+  { to: '/admin/ads', icon: Megaphone, label: 'Ad links', end: false },
 ]
 
 export function AdminLayout() {

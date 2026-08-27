@@ -171,7 +171,7 @@ export function defaultVideos(): Video[] {
 
 export function defaultAds(): Ad[] {
   return [
-    { id: 'ad_poster', slot: 'poster_click', name: 'Poster first / later clicks', type: 'direct_link', scriptCode: '', html: '', url: '', url2: '', labelEn: '', labelBn: '', enabled: false },
+    { id: 'ad_poster', slot: 'poster_click', name: 'Poster first / later clicks', type: 'direct_link', scriptCode: '', html: '', url: '', url2: '', url3: '', labelEn: '', labelBn: '', enabled: false },
     { id: 'ad_pop', slot: 'popunder', name: 'Monetag Popunder', type: 'script', scriptCode: '', html: '', url: '', labelEn: '', labelBn: '', enabled: false },
     { id: 'ad_header', slot: 'header', name: 'Header banner', type: 'html', scriptCode: '', html: '', url: '', labelEn: 'Sponsored', labelBn: 'স্পনসর্ড', enabled: false },
     { id: 'ad_player', slot: 'below_player', name: 'Below player', type: 'html', scriptCode: '', html: '', url: '', labelEn: '', labelBn: '', enabled: false },

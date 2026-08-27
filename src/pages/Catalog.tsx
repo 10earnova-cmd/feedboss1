@@ -84,19 +84,13 @@ export function TagPage() {
 
 export function SearchPage() {
   const { lang } = useLang()
-  const { published, tags, categories } = useSite()
+  const { published } = useSite()
   const [sp] = useSearchParams()
   const q = (sp.get('q') || '').trim().toLowerCase()
   const list = useMemo(() => {
     if (!q) return []
-    return published.filter((v) => {
-      const blob = `${v.titleBn} ${v.titleEn} ${v.captionBn} ${v.captionEn}`.toLowerCase()
-      const tagHit = tags.some((t) => v.tagIds.includes(t.id) && `${t.nameBn} ${t.nameEn}`.toLowerCase().includes(q))
-      const cat = categories.find((c) => c.id === v.categoryId)
-      const catHit = cat ? `${cat.nameBn} ${cat.nameEn}`.toLowerCase().includes(q) : false
-      return blob.includes(q) || tagHit || catHit
-    })
-  }, [q, published, tags, categories])
+    return published.filter((v) => `${v.titleBn} ${v.titleEn} ${v.captionBn} ${v.captionEn}`.toLowerCase().includes(q))
+  }, [q, published])
 
   return (
     <div>

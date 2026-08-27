@@ -6,12 +6,17 @@ export function posterClickAd(ads: Ad[]) {
   return ads.find((a) => a.slot === 'poster_click' && a.enabled) || null
 }
 
+function urlForClick(ad: Ad, n: number) {
+  if (n <= 0) return (ad.url || '').trim()
+  if (n === 1) return (ad.url2 || '').trim()
+  return (ad.url3 || '').trim()
+}
+
 export function peekPosterHref(videoId: string, ads: Ad[], watchHref: string) {
   const ad = posterClickAd(ads)
   if (!ad) return watchHref
   const n = Number(sessionStorage.getItem(keyFor(videoId)) || '0')
-  const chosen = (n === 0 ? ad.url : ad.url2 || '').trim()
-  return chosen || watchHref
+  return urlForClick(ad, n) || watchHref
 }
 
 export function takePosterHref(videoId: string, ads: Ad[], watchHref: string) {
