@@ -8,6 +8,7 @@ import { LegalPage, SearchPage } from './pages/Catalog'
 import { Home } from './pages/Home'
 import { Watch } from './pages/Watch'
 import { AdminAds } from './pages/admin/Ads'
+import { BulkUpload } from './pages/admin/BulkUpload'
 import { VideoEdit } from './pages/admin/VideoEdit'
 import { AdminVideos } from './pages/admin/Videos'
 
@@ -21,6 +22,7 @@ export default function App() {
                 <Route path="/admin/login" element={<Navigate to="/admin" replace />} />
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<VideoEdit />} />
+                  <Route path="bulk" element={<BulkUpload />} />
                   <Route path="videos" element={<AdminVideos />} />
                   <Route path="videos/new" element={<Navigate to="/admin" replace />} />
                   <Route path="videos/:id" element={<VideoEdit />} />

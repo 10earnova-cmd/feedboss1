@@ -29,9 +29,14 @@ export function AdminVideos() {
       <Seo title="Videos | Admin" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Videos</h1>
-        <Link to="/admin" className="btn btn-primary">
-          Upload
-        </Link>
+        <div className="flex gap-2">
+          <Link to="/admin/bulk" className="btn btn-ghost">
+            Bulk upload
+          </Link>
+          <Link to="/admin" className="btn btn-primary">
+            Upload
+          </Link>
+        </div>
       </div>
       <input className="input mt-4 max-w-sm" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search..." />
       <div className="card mt-4 overflow-x-auto">

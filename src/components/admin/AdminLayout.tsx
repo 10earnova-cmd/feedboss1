@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Clapperboard, Megaphone, Upload } from 'lucide-react'
+import { Clapperboard, Files, Megaphone, Upload } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { AdminLogin } from '../../pages/admin/Login'
 
 const links = [
   { to: '/admin', icon: Upload, label: 'Upload', end: true },
+  { to: '/admin/bulk', icon: Files, label: 'Bulk', end: false },
   { to: '/admin/videos', icon: Clapperboard, label: 'Videos', end: false },
   { to: '/admin/ads', icon: Megaphone, label: 'Ad links', end: false },
 ]

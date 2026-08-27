@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Seo } from '../../components/Seo'
 import { useSite } from '../../context/SiteContext'
 import { db, newId } from '../../lib/db'
@@ -133,7 +133,7 @@ export function VideoEdit() {
       return
     }
     if (files.length > 1) {
-      setMsg('Select one video file, or an .m3u8 playlist with all .ts segments.')
+      setMsg('For many videos at once, open Bulk upload.')
       return
     }
     const file = files.find((f) => /\.(mp4|webm)$/i.test(f.name)) || files[0]
@@ -241,6 +241,13 @@ export function VideoEdit() {
       <Seo title={isNew ? 'Upload' : 'Edit video'} />
       <h1 className="text-2xl font-bold">{isNew ? 'Upload' : 'Edit video'}</h1>
       <p className="mt-1 text-sm text-muted">Select a video and add a caption. Poster and scenes come from the file automatically.</p>
+      {isNew ? (
+        <p className="mt-2 text-sm">
+          <Link className="text-accent" to="/admin/bulk">
+            Bulk upload many videos
+          </Link>
+        </p>
+      ) : null}
       {msg && <p className="mt-3 text-sm text-accent">{msg}</p>}
 
       <label className="mt-6 block text-sm">Video</label>
