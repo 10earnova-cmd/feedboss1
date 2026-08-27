@@ -50,6 +50,12 @@ export function isImageKey(key) {
   )
 }
 
+export function isPlaylistKey(key) {
+  return String(key || '')
+    .toLowerCase()
+    .endsWith('.m3u8')
+}
+
 export function uploadCacheControl(key) {
   return isImageKey(key) ? 'public, max-age=86400' : undefined
 }

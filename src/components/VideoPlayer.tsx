@@ -1,28 +1,39 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Hls from 'hls.js'
-import { isHlsUrl, mediaCrossOrigin } from '../lib/media'
+import { isHlsUrl } from '../lib/media'
 
 export function VideoPlayer({ src, poster, title }: { src: string; poster: string; title: string }) {
   const el = useRef<HTMLVideoElement>(null)
+  const [err, setErr] = useState('')
 
   useEffect(() => {
     const video = el.current
     if (!video || !src) return
+    setErr('')
+
+    const onVideoError = () => {
+      setErr('Playback failed. Re-upload from admin — downloader MP4s often need device compress to H.264 HLS.')
+    }
+    video.addEventListener('error', onVideoError)
+
+    // Do NOT set crossOrigin on the player — R2 redirects + missing CORS block many downloader MP4s.
+    video.removeAttribute('crossorigin')
 
     if (!isHlsUrl(src)) {
       video.preload = 'auto'
       video.src = src
       return () => {
+        video.removeEventListener('error', onVideoError)
         video.removeAttribute('src')
         video.load()
       }
     }
 
-    // Safari / iOS native HLS — nudge ahead buffering via preload.
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.preload = 'auto'
       video.src = src
       return () => {
+        video.removeEventListener('error', onVideoError)
         video.removeAttribute('src')
         video.load()
       }
@@ -32,7 +43,6 @@ export function VideoPlayer({ src, poster, title }: { src: string; poster: strin
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
-        // Prefetch well ahead of playhead so the next chunks are already local.
         maxBufferLength: 120,
         maxMaxBufferLength: 360,
         backBufferLength: 30,
@@ -45,11 +55,14 @@ export function VideoPlayer({ src, poster, title }: { src: string; poster: strin
         progressive: true,
         capLevelToPlayerSize: true,
         startLevel: -1,
+        xhrSetup: (xhr) => {
+          // Same-origin /api/file playlists + segments (302 to R2).
+          xhr.withCredentials = false
+        },
       })
       hls.loadSource(src)
       hls.attachMedia(video)
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        // Kick fragment loader immediately even before play.
         try {
           hls.startLoad(-1)
         } catch {
@@ -58,14 +71,25 @@ export function VideoPlayer({ src, poster, title }: { src: string; poster: strin
       })
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal) return
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad()
-        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError()
-        else hls.destroy()
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          hls.startLoad()
+          return
+        }
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          hls.recoverMediaError()
+          return
+        }
+        setErr('Stream error. Re-upload the video from admin (device compress → HLS).')
+        hls.destroy()
       })
       return () => {
+        video.removeEventListener('error', onVideoError)
         hls.destroy()
       }
     }
+
+    setErr('This browser cannot play HLS. Try Chrome / Safari.')
+    return () => video.removeEventListener('error', onVideoError)
   }, [src])
 
   return (
@@ -75,11 +99,11 @@ export function VideoPlayer({ src, poster, title }: { src: string; poster: strin
         className="aspect-video w-full bg-black"
         controls
         playsInline
-        crossOrigin={mediaCrossOrigin(src)}
         poster={poster || undefined}
         preload="auto"
         title={title}
       />
+      {err ? <p className="mt-2 px-1 text-xs text-accent">{err}</p> : null}
     </div>
   )
 }

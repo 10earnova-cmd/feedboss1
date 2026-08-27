@@ -206,16 +206,18 @@ export async function uploadHlsPack(opts: {
     const batch = segments.slice(i, i + CONCURRENCY)
     await Promise.all(
       batch.map(async (item) => {
-        const up = await uploadMedia({
+        await uploadMedia({
           file: item.file,
           folder: 'videos',
           workerUrl: opts.workerUrl,
           uploadSecret: opts.uploadSecret,
           key: item.key,
         })
-        nameMap[item.original] = up.url
-        nameMap[item.file.name] = up.url
-        nameMap[item.key.split('/').pop() || item.file.name] = up.url
+        // Keep relative segment names (seg000.ts). Absolute /api/file URLs break after R2 redirects.
+        const base = item.key.split('/').pop() || item.file.name
+        nameMap[item.original] = base
+        nameMap[item.file.name] = base
+        nameMap[base] = base
         done += 1
         opts.onProgress?.(Math.round((done / total) * 100))
       }),

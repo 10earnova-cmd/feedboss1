@@ -1,6 +1,6 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import { cacheControlFor, contentTypeFor, isImageKey } from '../server/media.js'
+import { cacheControlFor, contentTypeFor, isImageKey, isPlaylistKey } from '../server/media.js'
 import { bucket, getS3, safeKey } from '../server/r2.js'
 
 function firstQuery(value) {
@@ -25,7 +25,19 @@ function keyFromReq(req) {
   return ''
 }
 
+function cors(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', '*')
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges, Content-Type')
+}
+
 export default async function handler(req, res) {
+  cors(res)
+  if (req.method === 'OPTIONS') {
+    res.status(204).end()
+    return
+  }
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.status(405).json({ error: 'Method not allowed' })
     return
@@ -38,16 +50,14 @@ export default async function handler(req, res) {
       return
     }
 
-    // Serve poster bytes directly so the browser caches /api/file/thumbs/... for 1 day.
-    // (302 + changing signed URLs cannot be cached across back/forward.)
-    if (isImageKey(key)) {
+    // Posters + m3u8 playlists: proxy bytes (playlists must stay on our origin so segment URLs resolve).
+    if (isImageKey(key) || isPlaylistKey(key)) {
       const obj = await getS3().send(new GetObjectCommand({ Bucket: bucket, Key: key }))
       const type = contentTypeFor(key, obj.ContentType)
-      const cache = cacheControlFor(key)
+      const cache = isPlaylistKey(key) ? 'public, max-age=60, must-revalidate' : cacheControlFor(key)
       res.setHeader('Content-Type', type)
       res.setHeader('Cache-Control', cache)
       res.setHeader('CDN-Cache-Control', cache)
-      res.setHeader('Vary', 'Accept-Encoding')
       if (req.method === 'HEAD') {
         if (obj.ContentLength != null) res.setHeader('Content-Length', String(obj.ContentLength))
         res.status(200).end()
