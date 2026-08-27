@@ -5,7 +5,7 @@ import { useSite } from '../../context/SiteContext'
 import { db, newId } from '../../lib/db'
 import { isHlsUrl, mediaCrossOrigin, parseHlsDuration, pickHlsPlaylist, VIDEO_ACCEPT, isVideoFile } from '../../lib/media'
 import { captureScenes, readVideoMeta, uploadHlsPack, uploadMedia } from '../../lib/storage'
-import { transcodeToHls } from '../../lib/transcode'
+import { prepareVideoForUpload } from '../../lib/transcode'
 import { slugify, uniqueSlug } from '../../lib/slug'
 import type { Video } from '../../types'
 
@@ -192,21 +192,34 @@ export function VideoEdit() {
         videoUrl = up.url
         if (up.duration) duration = up.duration
       } else if (videoFile) {
-        setMsg('Compressing on your device, then upload…')
-        const hls = await transcodeToHls(videoFile, (pct, label) => {
+        setMsg('Fixing / compressing on your device (Xmaster downloads need this)…')
+        const prepared = await prepareVideoForUpload(videoFile, (pct, label) => {
           setProgress(Math.min(70, pct))
           setMsg(label)
         })
-        setMsg('Uploading compressed HLS to Cloudflare…')
-        const up = await uploadHlsPack({
-          files: hls.files,
-          workerUrl,
-          uploadSecret: secret,
-          onProgress: (pct) => setProgress(70 + Math.round(pct * 0.28)),
-        })
-        videoUrl = up.url
-        if (up.duration) duration = up.duration
-        else if (hls.duration) duration = hls.duration
+        if (prepared.kind === 'hls') {
+          setMsg('Uploading HLS to Cloudflare…')
+          const up = await uploadHlsPack({
+            files: prepared.files,
+            workerUrl,
+            uploadSecret: secret,
+            onProgress: (pct) => setProgress(70 + Math.round(pct * 0.28)),
+          })
+          videoUrl = up.url
+          if (up.duration) duration = up.duration
+          else if (prepared.duration) duration = prepared.duration
+        } else {
+          setMsg('Uploading browser-safe MP4 to Cloudflare…')
+          const up = await uploadMedia({
+            file: prepared.file,
+            folder: 'videos',
+            workerUrl,
+            uploadSecret: secret,
+            onProgress: (pct) => setProgress(70 + Math.round(pct * 0.28)),
+          })
+          videoUrl = up.url
+          if (prepared.duration) duration = prepared.duration
+        }
       }
 
       if (sceneFiles.length) {
@@ -259,7 +272,7 @@ export function VideoEdit() {
       <Seo title={isNew ? 'Upload' : 'Edit video'} />
       <h1 className="text-2xl font-bold">{isNew ? 'Upload' : 'Edit video'}</h1>
       <p className="mt-1 text-sm text-muted">
-        Your device compresses the video first (smaller MB), then uploads HLS (m3u8) to Cloudflare. Player preloads ahead.
+        Device compress fixes Xmaster/downloader files (HEVC / broken MP4 → H.264). Then upload to Cloudflare.
       </p>
       {isNew ? (
         <p className="mt-2 text-sm">

@@ -2,7 +2,7 @@ import { db, newId } from './db'
 import { POSTER_PCT, SCENE_PCTS, sceneTime, isVideoFile } from './media'
 import { slugify, uniqueSlug } from './slug'
 import { captureThumb, captureScenes, seekVideo, uploadHlsPack, uploadMedia } from './storage'
-import { transcodeToHls } from './transcode'
+import { prepareVideoForUpload } from './transcode'
 import type { Video } from '../types'
 
 export function captionFromFilename(file: File) {
@@ -98,24 +98,38 @@ export async function publishVideoFile(opts: {
   if (!text) throw new Error('Add a caption')
   opts.onProgress?.(2)
 
-  // Poster from source while FFmpeg builds HLS — parallel for speed.
   const scenesTask = scenesFromFile(opts.file, false).catch(() => ({ duration: 0, scenes: [] as File[] }))
 
-  const hls = await transcodeToHls(opts.file, (pct, _label) => {
+  const prepared = await prepareVideoForUpload(opts.file, (pct) => {
     opts.onProgress?.(Math.min(70, Math.round(pct * 0.7)))
   })
   opts.onProgress?.(72)
 
-  const [{ duration: metaDur, scenes }, up] = await Promise.all([
-    scenesTask,
-    uploadHlsPack({
-      files: hls.files,
+  let videoUrl = ''
+  let duration = 0
+
+  if (prepared.kind === 'hls') {
+    const up = await uploadHlsPack({
+      files: prepared.files,
       workerUrl: opts.workerUrl,
       uploadSecret: opts.uploadSecret,
       onProgress: (pct) => opts.onProgress?.(72 + Math.round(pct * 0.22)),
-    }),
-  ])
+    })
+    videoUrl = up.url
+    duration = up.duration || prepared.duration
+  } else {
+    const up = await uploadMedia({
+      file: prepared.file,
+      folder: 'videos',
+      workerUrl: opts.workerUrl,
+      uploadSecret: opts.uploadSecret,
+      onProgress: (pct) => opts.onProgress?.(72 + Math.round(pct * 0.22)),
+    })
+    videoUrl = up.url
+    duration = prepared.duration
+  }
 
+  const { duration: metaDur, scenes } = await scenesTask
   const previewUrls = await uploadAllThumbs(scenes, opts.workerUrl, opts.uploadSecret)
   opts.onProgress?.(96)
 
@@ -127,10 +141,10 @@ export async function publishVideoFile(opts: {
     titleBn: text,
     captionEn: text,
     captionBn: text,
-    videoUrl: up.url,
+    videoUrl,
     thumbnailUrl: previewUrls[0] || '',
     previewUrls,
-    duration: up.duration || hls.duration || metaDur || 0,
+    duration: duration || metaDur || 0,
     views: 0,
     likes: 0,
     categoryId: '',
