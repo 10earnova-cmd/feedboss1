@@ -1,5 +1,6 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { cacheControlFor, contentTypeFor, isImageKey } from '../server/media.js'
 import { bucket, getS3, safeKey } from '../server/r2.js'
 
 function firstQuery(value) {
@@ -37,10 +38,35 @@ export default async function handler(req, res) {
       return
     }
 
-    const url = await getSignedUrl(getS3(), new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: 3600 })
-    res.setHeader('Cache-Control', 'private, max-age=30')
+    // Serve poster bytes directly so the browser caches /api/file/thumbs/... for 1 day.
+    // (302 + changing signed URLs cannot be cached across back/forward.)
+    if (isImageKey(key)) {
+      const obj = await getS3().send(new GetObjectCommand({ Bucket: bucket, Key: key }))
+      const type = contentTypeFor(key, obj.ContentType)
+      const cache = cacheControlFor(key)
+      res.setHeader('Content-Type', type)
+      res.setHeader('Cache-Control', cache)
+      res.setHeader('CDN-Cache-Control', cache)
+      res.setHeader('Vary', 'Accept-Encoding')
+      if (req.method === 'HEAD') {
+        if (obj.ContentLength != null) res.setHeader('Content-Length', String(obj.ContentLength))
+        res.status(200).end()
+        return
+      }
+      const bytes = Buffer.from(await obj.Body.transformToByteArray())
+      res.setHeader('Content-Length', String(bytes.length))
+      res.status(200).send(bytes)
+      return
+    }
+
+    const url = await getSignedUrl(getS3(), new GetObjectCommand({ Bucket: bucket, Key: key }), {
+      expiresIn: 86400,
+    })
+    res.setHeader('Cache-Control', 'private, max-age=300')
     res.redirect(302, url)
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'File error' })
+    const msg = err instanceof Error ? err.message : 'File error'
+    const missing = /NoSuchKey|NotFound|404/i.test(msg) || err?.$metadata?.httpStatusCode === 404
+    res.status(missing ? 404 : 500).json({ error: missing ? 'Not found' : msg })
   }
 }

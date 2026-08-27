@@ -50,11 +50,12 @@ function contentTypeOf(file: File, key: string) {
   return mimeForVideoExt(videoExt(key) || videoExt(file.name), 'application/octet-stream')
 }
 
-function putFile(url: string, file: File, contentType: string, onProgress?: UploadProgress) {
+function putFile(url: string, file: File, contentType: string, onProgress?: UploadProgress, cacheControl?: string) {
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', url)
     xhr.setRequestHeader('Content-Type', contentType)
+    if (cacheControl) xhr.setRequestHeader('Cache-Control', cacheControl)
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100))
     }
@@ -95,9 +96,22 @@ export async function uploadMedia(opts: {
     body: JSON.stringify({ key: keyHint, contentType }),
   })
   if (signRes.ok) {
-    const signed = (await signRes.json()) as { putUrl?: string; url?: string; key?: string; contentType?: string; error?: string }
+    const signed = (await signRes.json()) as {
+      putUrl?: string
+      url?: string
+      key?: string
+      contentType?: string
+      cacheControl?: string
+      error?: string
+    }
     if (!signed.putUrl) throw new Error(signed.error || 'Sign URL missing')
-    await putFile(signed.putUrl, opts.file, signed.contentType || contentType, opts.onProgress)
+    await putFile(
+      signed.putUrl,
+      opts.file,
+      signed.contentType || contentType,
+      opts.onProgress,
+      signed.cacheControl || undefined,
+    )
     return { url: publicMediaUrl(workerUrl, signed.key || keyHint, signed.url), key: signed.key || keyHint }
   }
 

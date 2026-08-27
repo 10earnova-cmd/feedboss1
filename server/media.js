@@ -24,7 +24,32 @@ export function contentTypeFor(key, fallback = 'application/octet-stream') {
 }
 
 export function cacheControlFor(key) {
-  return String(key || '').toLowerCase().endsWith('.m3u8')
-    ? 'public, max-age=60, must-revalidate'
-    : 'public, max-age=31536000, immutable'
+  const lower = String(key || '').toLowerCase()
+  if (lower.endsWith('.m3u8')) return 'public, max-age=60, must-revalidate'
+  // Posters / thumbs: browser keeps 1 day — back navigation uses disk cache, no re-download.
+  if (
+    lower.startsWith('thumbs/') ||
+    lower.startsWith('images/') ||
+    lower.endsWith('.jpg') ||
+    lower.endsWith('.jpeg') ||
+    lower.endsWith('.png') ||
+    lower.endsWith('.webp') ||
+    lower.endsWith('.gif')
+  ) {
+    return 'public, max-age=86400, stale-while-revalidate=86400'
+  }
+  return 'public, max-age=3600'
+}
+
+export function isImageKey(key) {
+  const lower = String(key || '').toLowerCase()
+  return (
+    lower.startsWith('thumbs/') ||
+    lower.startsWith('images/') ||
+    /\.(jpe?g|png|webp|gif)$/i.test(lower)
+  )
+}
+
+export function uploadCacheControl(key) {
+  return isImageKey(key) ? 'public, max-age=86400' : undefined
 }

@@ -1,6 +1,6 @@
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import { contentTypeFor } from '../server/media.js'
+import { contentTypeFor, uploadCacheControl } from '../server/media.js'
 import { bucket, getS3, safeKey, verifyFirebase } from '../server/r2.js'
 
 function readJson(req) {
@@ -40,12 +40,18 @@ export default async function handler(req, res) {
     }
 
     const contentType = contentTypeFor(key, body.contentType)
+    const cacheControl = uploadCacheControl(key)
     const putUrl = await getSignedUrl(
       getS3(),
-      new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType }),
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        ContentType: contentType,
+        ...(cacheControl ? { CacheControl: cacheControl } : {}),
+      }),
       { expiresIn: 3600 },
     )
-    res.status(200).json({ putUrl, url: `/api/file/${key}`, key, contentType })
+    res.status(200).json({ putUrl, url: `/api/file/${key}`, key, contentType, cacheControl: cacheControl || '' })
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Sign failed' })
   }

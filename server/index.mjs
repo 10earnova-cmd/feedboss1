@@ -3,7 +3,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { corsHeaderRecord, preflight } from './cors.js'
-import { cacheControlFor, contentTypeFor } from './media.js'
+import { cacheControlFor, contentTypeFor, uploadCacheControl } from './media.js'
 import { bucket, getS3, safeKey, verifyFirebase } from './r2.js'
 
 const port = Number(process.env.API_PORT || 8788)
@@ -35,12 +35,18 @@ app.post('/api/sign', async (c) => {
   const key = safeKey(body.key)
   if (!key) return c.json({ error: 'Invalid key' }, 400)
   const contentType = contentTypeFor(key, body.contentType)
+  const cacheControl = uploadCacheControl(key)
   const putUrl = await getSignedUrl(
     s3,
-    new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType }),
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ContentType: contentType,
+      ...(cacheControl ? { CacheControl: cacheControl } : {}),
+    }),
     { expiresIn: 3600 },
   )
-  return c.json({ putUrl, url: `/api/file/${key}`, key, contentType })
+  return c.json({ putUrl, url: `/api/file/${key}`, key, contentType, cacheControl: cacheControl || '' })
 })
 
 app.post('/api/upload', async (c) => {
