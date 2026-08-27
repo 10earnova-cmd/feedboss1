@@ -16,9 +16,9 @@ export function Layout() {
     return (
       <div className="grid min-h-svh place-items-center bg-ink px-4">
         <div className="card w-full max-w-lg p-8 text-center">
-          <p className="font-display text-4xl font-extrabold">
+          <p className="logo text-4xl">
             {(lang === 'bn' ? settings.siteNameBn : settings.siteNameEn).replace(/x|X|এক্স/i, '')}
-            <span className="text-accent">X</span>
+            <span className="logo-x">X</span>
           </p>
           <h1 className="mt-4 text-xl font-bold">{tr('ageTitle', lang)}</h1>
           <p className="mt-3 text-sm leading-relaxed text-muted">
@@ -41,10 +41,10 @@ export function Layout() {
     <div className="flex min-h-svh flex-col">
       <PopunderAd ads={ads} />
       <Header />
-      <div className="page py-3">
+      <div className="page py-2">
         <AdSlot slot="header" ads={ads} />
       </div>
-      <main className="page flex-1 pb-24">
+      <main className="page flex-1 pb-20 pt-2">
         <Outlet />
       </main>
       <Footer />

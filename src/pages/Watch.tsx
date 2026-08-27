@@ -5,10 +5,12 @@ import { AdSlot } from '../components/AdSlot'
 import { Seo } from '../components/Seo'
 import { VideoGrid } from '../components/VideoGrid'
 import { VideoPlayer } from '../components/VideoPlayer'
+import { VideoThumb } from '../components/VideoThumb'
 import { useLang } from '../context/LangContext'
 import { useSite } from '../context/SiteContext'
 import { db } from '../lib/db'
 import { formatDate, formatViews, pick } from '../lib/format'
+import { usablePoster } from '../lib/media'
 import { tr } from '../i18n'
 
 export function Watch() {
@@ -59,7 +61,7 @@ export function Watch() {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
       <Seo title={`${title} | DeshiX`} description={caption} />
       <div>
-        <VideoPlayer src={video.videoUrl} poster={video.thumbnailUrl} title={title} />
+        <VideoPlayer src={video.videoUrl} poster={usablePoster(video.thumbnailUrl)} title={title} />
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <AdSlot slot="watch_cta" ads={ads} />
           <AdSlot slot="download_cta" ads={ads} />
@@ -115,7 +117,7 @@ export function Watch() {
           </div>
         )}
         {related.length > 0 && (
-          <section className="mt-8">
+          <section className="mt-8 lg:hidden">
             <h2 className="mb-3 text-lg font-bold">{tr('related', lang)}</h2>
             <VideoGrid videos={related} />
           </section>
@@ -124,14 +126,13 @@ export function Watch() {
       <aside className="space-y-4">
         <AdSlot slot="sidebar" ads={ads} />
         <div className="card p-3">
-          <h2 className="mb-3 text-sm font-bold">{tr('trending', lang)}</h2>
+          <h2 className="mb-3 text-sm font-bold">{tr('related', lang)}</h2>
           <div className="space-y-3">
-            {published
-              .filter((v) => v.trending && v.id !== video.id)
-              .slice(0, 6)
+            {(related.length ? related : published.filter((v) => v.id !== video.id))
+              .slice(0, 8)
               .map((v) => (
-                <Link key={v.id} to={`/watch/${v.slug}`} className="flex gap-3">
-                  <img src={v.thumbnailUrl} alt="" className="h-16 w-28 rounded-lg object-cover" />
+                <Link key={v.id} to={`/watch/${v.slug}`} className="watch-side-item">
+                  <VideoThumb src={v.videoUrl} poster={usablePoster(v.thumbnailUrl)} duration={v.duration} />
                   <span className="line-clamp-3 text-sm">{pick(v, lang, 'title')}</span>
                 </Link>
               ))}

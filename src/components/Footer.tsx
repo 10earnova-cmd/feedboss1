@@ -10,20 +10,21 @@ export function Footer() {
   const name = lang === 'bn' ? settings.siteNameBn : settings.siteNameEn
 
   return (
-    <footer className="mt-12 border-t border-line bg-panel">
+    <footer className="mt-8 border-t border-line bg-[#0d0d0d]">
       <div className="page py-6">
         <AdSlot slot="footer" ads={ads} className="mb-6" />
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <p className="font-display text-lg font-extrabold">
-            {name}
-            <span className="ml-2 text-xs font-semibold text-accent">18+</span>
+          <p className="logo text-xl">
+            {name.replace(/x|X|এক্স/i, '')}
+            <span className="logo-x">X</span>
+            <span className="ml-2 align-middle text-xs font-semibold text-accent">18+</span>
           </p>
           <div className="flex flex-wrap gap-4 text-sm text-muted">
-            <Link to="/about">{tr('about', lang)}</Link>
-            <Link to="/terms">{tr('terms', lang)}</Link>
-            <Link to="/privacy">{tr('privacy', lang)}</Link>
-            <Link to="/dmca">{tr('dmca', lang)}</Link>
-            <Link to="/2257">{tr('rec2257', lang)}</Link>
+            <Link className="hover:text-accent" to="/about">{tr('about', lang)}</Link>
+            <Link className="hover:text-accent" to="/terms">{tr('terms', lang)}</Link>
+            <Link className="hover:text-accent" to="/privacy">{tr('privacy', lang)}</Link>
+            <Link className="hover:text-accent" to="/dmca">{tr('dmca', lang)}</Link>
+            <Link className="hover:text-accent" to="/2257">{tr('rec2257', lang)}</Link>
           </div>
         </div>
         <p className="mt-4 text-xs text-muted">

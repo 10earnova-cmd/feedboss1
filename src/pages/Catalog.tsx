@@ -6,10 +6,12 @@ import { VideoGrid } from '../components/VideoGrid'
 import { useLang } from '../context/LangContext'
 import { useSite } from '../context/SiteContext'
 import { pick } from '../lib/format'
+import { usablePoster } from '../lib/media'
 import { tr } from '../i18n'
+import { VideoThumb } from '../components/VideoThumb'
 import type { Video } from '../types'
 
-const PAGE = 24
+const PAGE = 36
 
 function pageOf(list: Video[], page: number) {
   const pages = Math.max(1, Math.ceil(list.length / PAGE))
@@ -114,18 +116,25 @@ export function CategoriesPage() {
     <div>
       <Seo title={`${tr('categories', lang)} | DeshiX`} />
       <h1 className="mb-4 text-2xl font-bold">{tr('categories', lang)}</h1>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="video-grid">
         {categories.map((c) => {
           const count = published.filter((v) => v.categoryId === c.id).length
+          const sample = published.find((v) => v.categoryId === c.id)
           return (
-            <Link key={c.id} to={`/category/${c.slug}`} className="card overflow-hidden hover:border-accent">
-              <div className="thumb">
-                {c.thumbnailUrl ? <img src={c.thumbnailUrl} alt="" /> : <div className="grid h-full place-items-center bg-raised text-3xl">▶</div>}
-              </div>
-              <div className="p-3">
-                <h2 className="font-bold">{pick(c, lang, 'name')}</h2>
-                <p className="text-xs text-muted">{count} {lang === 'bn' ? 'ভিডিও' : 'videos'}</p>
-              </div>
+            <Link key={c.id} to={`/category/${c.slug}`} className="vcard">
+              {c.thumbnailUrl ? (
+                <div className="thumb">
+                  <img src={c.thumbnailUrl} alt="" />
+                </div>
+              ) : sample ? (
+                <VideoThumb src={sample.videoUrl} poster={usablePoster(sample.thumbnailUrl)} preview={false} />
+              ) : (
+                <div className="thumb">
+                  <div className="thumb-empty" />
+                </div>
+              )}
+              <h3 className="vcard-title">{pick(c, lang, 'name')}</h3>
+              <p className="vcard-meta">{count} {lang === 'bn' ? 'ভিডিও' : 'videos'}</p>
             </Link>
           )
         })}

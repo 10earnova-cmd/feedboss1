@@ -153,7 +153,7 @@ export function defaultVideos(): Video[] {
     captionEn: `${t.en}. Sample placeholder video for layout. Replace from /admin after connecting Cloudflare R2.`,
     captionBn: `${t.bn}। ডেমো প্লেসহোল্ডার ভিডিও। Cloudflare R2 কানেক্ট করে /admin থেকে আসল ফাইল আপলোড করুন।`,
     videoUrl: samples[i % samples.length],
-    thumbnailUrl: `https://picsum.photos/seed/deshix${i + 11}/800/450`,
+    thumbnailUrl: '',
     duration: 90 + i * 37,
     views: 1200 + i * 1840,
     likes: 40 + i * 13,

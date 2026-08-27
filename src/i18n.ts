@@ -5,6 +5,7 @@ export const t = {
   exit: { bn: 'বেরিয়ে যান', en: 'Leave' },
   ageTitle: { bn: 'প্রাপ্তবয়স্ক কনটেন্ট', en: 'Adult content' },
   search: { bn: 'ভিডিও খুঁজুন...', en: 'Search videos...' },
+  searchGo: { bn: 'সার্চ', en: 'Search' },
   home: { bn: 'হোম', en: 'Home' },
   latest: { bn: 'লেটেস্ট', en: 'Latest' },
   trending: { bn: 'ট্রেন্ডিং', en: 'Trending' },

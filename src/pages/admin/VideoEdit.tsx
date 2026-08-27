@@ -68,6 +68,41 @@ export function VideoEdit() {
     )
   }, [form, videos])
 
+  useEffect(() => {
+    const el = previewRef.current
+    if (!el || !previewSrc) return
+    let done = false
+    const grab = async () => {
+      if (done) return
+      done = true
+      try {
+        const blob = await captureThumb(el)
+        setThumbFile(new File([blob], 'thumb.jpg', { type: 'image/jpeg' }))
+        const url = URL.createObjectURL(blob)
+        setForm((f) => (f ? { ...f, thumbnailUrl: url } : f))
+      } catch {
+        /* canvas may fail on cross-origin URLs */
+      }
+    }
+    const onSeeked = () => {
+      void grab()
+    }
+    const onLoaded = () => {
+      try {
+        el.currentTime = Math.min(2, (el.duration || 2) * 0.1)
+      } catch {
+        void grab()
+      }
+    }
+    el.addEventListener('loadeddata', onLoaded)
+    el.addEventListener('seeked', onSeeked)
+    if (el.readyState >= 2) onLoaded()
+    return () => {
+      el.removeEventListener('loadeddata', onLoaded)
+      el.removeEventListener('seeked', onSeeked)
+    }
+  }, [previewSrc])
+
   if (!form) return <p className="text-muted">Video not found.</p>
 
   const set = <K extends keyof Video>(key: K, value: Video[K]) => setForm({ ...form, [key]: value })
@@ -81,17 +116,6 @@ export function VideoEdit() {
       localUrl.current = meta.objectUrl
       setPreviewSrc(meta.objectUrl)
       setForm((f) => (f ? { ...f, duration: meta.duration } : f))
-      const el = previewRef.current
-      if (el) {
-        el.src = meta.objectUrl
-        el.onloadeddata = async () => {
-          try {
-            el.currentTime = Math.min(2, (el.duration || 2) * 0.1)
-          } catch {
-            /* ignore */
-          }
-        }
-      }
     } catch (err) {
       setMsg(err instanceof Error ? err.message : 'Could not read video')
     }
@@ -187,10 +211,11 @@ export function VideoEdit() {
           <label className="text-sm">Or video URL</label>
           <input className="input" value={form.videoUrl} onChange={(e) => set('videoUrl', e.target.value)} placeholder="https://cdn.../video.mp4" />
           <video ref={previewRef} className="mt-2 aspect-video w-full rounded-xl bg-black" controls src={previewSrc || form.videoUrl} />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button className="btn btn-ghost" type="button" onClick={() => void grabThumb()}>
               Capture thumbnail from video
             </button>
+            <p className="text-xs text-muted">Auto-captured from ~2s when you pick a file. Seek then recapture if needed.</p>
           </div>
           <label className="text-sm">Thumbnail file</label>
           <input

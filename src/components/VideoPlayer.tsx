@@ -1,27 +1,24 @@
-import { useEffect, useRef } from 'react'
-
 export function VideoPlayer({ src, poster, title }: { src: string; poster: string; title: string }) {
-  const ref = useRef<HTMLVideoElement>(null)
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.load()
-  }, [src])
-
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-black">
+    <div className="player-wrap">
       <video
-        ref={ref}
         className="aspect-video w-full bg-black"
         controls
         playsInline
-        poster={poster}
+        poster={poster || undefined}
         preload="metadata"
         title={title}
-      >
-        <source src={src} />
-      </video>
+        src={src}
+        onLoadedMetadata={(e) => {
+          if (poster) return
+          const el = e.currentTarget
+          try {
+            el.currentTime = Math.min(1.5, (el.duration || 3) * 0.08)
+          } catch {
+            /* ignore */
+          }
+        }}
+      />
     </div>
   )
 }

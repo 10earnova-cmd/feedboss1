@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
 import { useMemo, useState } from 'react'
 import { Seo } from '../../components/Seo'
+import { VideoThumb } from '../../components/VideoThumb'
 import { useSite } from '../../context/SiteContext'
+import { usablePoster } from '../../lib/media'
 import { db } from '../../lib/db'
 import type { VideoStatus } from '../../types'
 
@@ -63,7 +65,9 @@ export function AdminVideos() {
               return (
                 <tr key={v.id} className="border-t border-line">
                   <td className="p-3">
-                    <img src={v.thumbnailUrl} alt="" className="h-12 w-20 rounded object-cover" />
+                    <div className="h-12 w-20 overflow-hidden rounded">
+                      <VideoThumb src={v.videoUrl} poster={usablePoster(v.thumbnailUrl)} preview={false} />
+                    </div>
                   </td>
                   <td className="p-3">
                     <div className="font-semibold">{v.titleEn || v.titleBn}</div>
