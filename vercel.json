@@ -4,6 +4,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/file/:path*",
+      "destination": "/api/file?key=:path*"
+    },
+    {
       "source": "/((?!assets/|api/).*)",
       "destination": "/index.html"
     }
