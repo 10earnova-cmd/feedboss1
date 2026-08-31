@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AdminLayout } from './components/admin/AdminLayout'
+import { GoogleAnalytics } from './components/GoogleAnalytics'
 import { Layout } from './components/Layout'
 import { AuthProvider } from './context/AuthContext'
 import { LangProvider } from './context/LangContext'
@@ -15,6 +16,7 @@ import { AdminVideos } from './pages/admin/Videos'
 export default function App() {
   return (
     <BrowserRouter>
+      <GoogleAnalytics />
       <LangProvider>
         <AuthProvider>
           <SiteProvider>
